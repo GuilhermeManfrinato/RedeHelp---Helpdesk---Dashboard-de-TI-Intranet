@@ -1,152 +1,61 @@
-# 🇧🇷 Sistema de Chamados de TI e Cautela de Notebooks - Exército Brasileiro
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Em%20Desenvolvimento-yellow?style=for-the-badge&logo=github" alt="Status" />
+  <img src="https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Docker-Containerized-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
+</p>
 
-Sistema de gestão de chamados de informática e controle de cautela de notebooks desenvolvido para Organizações Militares (OM) do **Exército Brasileiro**. 
+<h1 align="center">🛠️ 2º GAC L — HelpDesk & Cautela de Notebooks</h1>
 
-O sistema conta com **duas interfaces separadas por URL**:
-1. **Central do Solicitante (`/`)**: Aberto para qualquer militar na intranet abrir chamados e consultar o andamento informando exclusivamente o **código do chamado**.
-2. **Painel Administrativo da Seção de TI (`/admin`)**: Acesso restrito por URL com tela de login e senha para gerenciar a fila de chamados e o controle patrimonial de cautelas.
+<p align="center">
+  <b>Sistema Integrado de Gestão de Chamados de TI e Controle de Cautelas de Equipamentos.</b>
+</p>
 
----
-
-## 🔑 Credenciais de Acesso da Seção de TI
-
-| Função | Usuário / Login | Senha |
-|---|---|---|
-| **Painel Administrativo (`/admin`)** | `info` | `R3gD300d0r0!` |
-| **Assinatura de Cautela / Descautela** | *Chefe ou Auxiliar de TI* | `admin` |
-
----
-
-## 💻 Tudo o que você precisa instalar no seu computador para codar
-
-Para editar, desenvolver e rodar o projeto na sua máquina com o **Visual Studio Code**, instale os seguintes programas gratuitos:
-
-### 1. Node.js (Versão LTS recomendada: v20 ou superior)
-- **O que é**: O ambiente de execução do JavaScript/TypeScript.
-- **Como baixar**: Acesse [https://nodejs.org](https://nodejs.org) e baixe a versão **LTS**.
-- **Como verificar**: Abra o terminal ou CMD e digite:
-  ```bash
-  node -v
-  npm -v
-  ```
-
-### 2. Git
-- **O que é**: Sistema de controle de versão para baixar e enviar o código para o GitHub.
-- **Como baixar**: Acesse [https://git-scm.com](https://git-scm.com) e instale com as opções padrão.
-- **Como verificar**: Digite no terminal:
-  ```bash
-  git --version
-  ```
-
-### 3. Visual Studio Code (VS Code)
-- **O que é**: O editor de código recomendado.
-- **Como baixar**: Acesse [https://code.visualstudio.com](https://code.visualstudio.com).
-
-### 4. Extensões Recomendadas no VS Code
-Abra o VS Code, aperte `Ctrl + Shift + X` e instale:
-- **Tailwind CSS IntelliSense** (auto-completar de classes de estilo)
-- **ESLint** (verificação de código e boas práticas)
-- **Prettier - Code formatter** (formatação automática)
-- **TypeScript and JavaScript Language Features** (já vem nativo no VS Code)
+<p align="center">
+  <a href="#-sobre-o-projeto">Sobre</a> •
+  <a href="#-funcionalidades">Funcionalidades</a> •
+  <a href="#-tecnologias">Tecnologias</a> •
+  <a href="#-como-executar">Como Executar</a> •
+  <a href="#-estrutura-do-projeto">Estrutura</a> •
+  <a href="#-autor">Autor</a>
+</p>
 
 ---
 
-## 🚀 Como baixar do GitHub e rodar no seu computador
+## 📌 Sobre o Projeto
 
-### Passo 1: Clonar o repositório
-Abra o terminal (ou Git Bash) e execute:
-```bash
-git clone https://github.com/SEU-USUARIO/sistema-ti-exercito.git
-cd sistema-ti-exercito
-```
+O **2º GAC L - HelpDesk & Cautela de Notebooks** é uma solução web desenvolvida para otimizar e centralizar os atendimentos da **Seção de Informática**. O sistema une o gerenciamento completo de tickets de suporte técnico com um módulo dedicado para cautelas e empréstimos de notebooks e periféricos.
 
-### Passo 2: Abrir no VS Code
-```bash
-code .
-```
-
-### Passo 3: Instalar as dependências do projeto
-No terminal integrado do VS Code (`Ctrl + '`), execute:
-```bash
-npm install
-```
-
-### Passo 4: Executar o servidor de desenvolvimento
-```bash
-npm run dev
-```
-
-O sistema estará rodando em:
-- **Central do Solicitante**: `http://localhost:3000/`
-- **Painel Administrativo da TI**: `http://localhost:3000/admin`
+Totalmente containerizado via **Docker**, a aplicação garante fácil implantação, portabilidade e execução padronizada na rede local do Regimento.
 
 ---
 
-## 📁 Estrutura de Arquivos para Edição no VS Code
+## ✨ Funcionalidades Principais
 
-```text
-├── index.html                 # Página HTML base com fontes e títulos do Exército Brasileiro
-├── package.json               # Dependências do projeto (React, Tailwind CSS, Lucide Icons)
-├── tsconfig.json              # Configurações do TypeScript
-├── vite.config.ts             # Configuração do Vite e Tailwind v4
-└── src/
-    ├── main.tsx               # Ponto de entrada da aplicação React
-    ├── index.css              # Estilos globais e paleta verde-oliva militar
-    ├── App.tsx                # Roteamento por URL (/ vs /admin) e controle de estado
-    ├── types/
-    │   └── index.ts           # Tipagens (Chamados, Seções da OM, Técnicos, Cautelas)
-    ├── data/
-    │   └── mockData.ts        # Dados iniciais pré-cadastrados (Seções da OM e materiais)
-    ├── utils/
-    │   └── storage.ts         # Persistência local (LocalStorage)
-    └── components/
-        ├── Header.tsx         # Barra superior institucional do Exército Brasileiro
-        ├── EmployeePortal.tsx # Portal do Militar (abertura de chamado e busca por código)
-        ├── ITDashboard.tsx    # Fila de atendimento da TI (Quadro Kanban e Tabela)
-        ├── NotebookLoans.tsx  # Cautela de Notebooks com laudo de avarias na descautela
-        └── AdminLogin.tsx     # Tela de login militar restrita (info / R3gD300d0r0!)
-```
+### 🎧 Gestão de Chamados (Helpdesk)
+- 📝 **Abertura Simplificada:** Registro ágil de problemas técnicos categorizados por setor e prioridade.
+- 📊 **Painel de Acompanhamento:** Status do atendimento atualizado em tempo real (*Aberto*, *Em Andamento*, *Concluído*).
+- 🏷️ **Triagem do Atendimento:** Organização por fila de chamados e atribuição aos técnicos de TI.
+
+### 💻 Cautela e Controle de Equipamentos
+- 📋 **Controle de Empréstimo:** Registro rápido de saída e devolução de notebooks e materiais.
+- ⏱️ **Histórico & Rastreabilidade:** Acompanhamento do termo de responsabilidade e prazos de devolução.
+- 🚨 **Gestão de Pendências:** Identificação imediata de materiais sob cautela ativa.
 
 ---
 
-## 📤 Como subir o projeto para o GitHub pela primeira vez
+## 🛠️ Tecnologias Utilizadas
 
-No terminal da pasta do projeto, execute os comandos:
-
-```bash
-# 1. Iniciar o repositório Git local
-git init
-
-# 2. Adicionar todos os arquivos
-git add .
-
-# 3. Fazer o primeiro commit
-git commit -m "feat: Sistema de Chamados de TI e Cautela de Notebooks - EB"
-
-# 4. Renomear o branch principal para main
-git branch -M main
-
-# 5. Conectar ao seu repositório criado no GitHub
-git remote add origin https://github.com/SEU-USUARIO/sistema-ti-exercito.git
-
-# 6. Enviar para o GitHub
-git push -u origin main
-```
+| Camada | Tecnologia | Função |
+| :--- | :--- | :--- |
+| **Frontend** | ![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black) | Interface reativa e componentes modulares |
+| **Linguagem** | ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) | Tipagem estática para maior confiabilidade |
+| **Build Tool** | ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white) | Bundler rápido para ambiente de Dev e Prod |
+| **Estilização** | ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white) | Design moderno, limpo e responsivo |
+| **Backend** | ![NodeJS](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white) | Servidor API RESTful (`tsx server.ts`) |
+| **Banco de Dados** | ![MySQL](https://img.shields.io/badge/MySQL_8.0-4479A1?style=flat-square&logo=mysql&logoColor=white) | Persistência de dados relacional |
+| **Containers** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) | Orquestração da aplicação e banco via Docker Compose |
 
 ---
-
-## 🛠️ Comandos Disponíveis
-
-| Comando | Descrição |
-|---|---|
-| `npm run dev` | Inicia o servidor local de desenvolvimento na porta 3000 |
-| `npm run build` | Compila o projeto otimizado para produção na pasta `dist/` |
-| `npm run preview` | Testa localmente a versão compilada de produção |
-| `npm run lint` | Executa o verificador de tipos TypeScript para validar o código |
-
----
-
-## 🔒 Segurança e Privacidade das Seções
-- **Consulta Sigilosa**: Militares só conseguem visualizar o andamento de um chamado digitando o código exato (ex: `CH-1001`). Não há listagem pública de chamados de outras seções.
-- **Acesso Administrativo Restrito**: Usuários comuns na intranet não veem links para o painel de TI. O acesso é feito apenas digitando `/admin` na barra de endereços com login militar.
-- **Cautelas Auditadas**: Empréstimos e devoluções exigem assinatura digital com senha do Chefe ou Auxiliar da Seção de Informática.
