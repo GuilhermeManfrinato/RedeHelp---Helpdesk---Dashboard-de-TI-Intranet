@@ -73,8 +73,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const [isManualExpanded, setIsManualExpanded] = useState<boolean>(false);
   const [showTvModal, setShowTvModal] = useState<boolean>(false);
 
-  const isSecInfo = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' || currentUser?.role === 'CHSECINFO';
-  const isTvAllowed = currentUser?.role === 'CH-TVINFO' || currentUser?.username === 'dev';
+  const isSecInfo = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' || currentUser?.role === 'CHSECINFO' || currentUser?.username === 'dev';
+  const isTech = currentUser?.role === 'CH-TECNICOINFO' || currentUser?.role === 'TECINFO';
+  const isTvAllowed = currentUser?.role === 'CH-TVINFO' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
 
   const handleTvClick = () => {
     if (isTvAllowed) {
@@ -135,7 +136,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         onMouseLeave={() => {
           setIsHovered(false);
         }}
-        className={`shrink-0 transition-all duration-300 ease-in-out border-r shadow-2xl flex flex-col ${
+        className={`shrink-0 transition-[width] duration-200 ease-out border-r shadow-2xl flex flex-col ${
           isExpanded ? 'w-72' : 'w-20'
         } ${
           a11y.highContrast
@@ -172,7 +173,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   Exército Brasileiro
                 </span>
                 <h1 className="text-sm font-black tracking-tight text-white leading-tight truncate">
-                  2º GAC - REGIMENTO DEODORO
+                  2º GAC
                 </h1>
                 <span className="text-[11px] text-emerald-200/80 font-mono tracking-tight block truncate">
                   Seção de Informática & TI
@@ -424,34 +425,36 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 </button>
               )}
 
-              {/* Item 5: Painel TV da Sala (Disponível para todos, com alerta restritivo se não for tvinfo) */}
-              <button
-                onClick={handleTvClick}
-                title="Painel TV da Sala (Telão Operacional)"
-                className={`w-full rounded-2xl text-left text-xs font-bold transition-all flex items-center group bg-[#1a2c15] text-[#dfb642] hover:bg-[#233c1d] border border-[#cba135]/40 shadow-xs cursor-pointer ${
-                  isExpanded ? 'px-3.5 py-3 justify-between' : 'p-3 justify-center'
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 rounded-xl bg-[#27431e] text-[#dfb642] shrink-0">
-                    <Tv className="w-4 h-4" />
-                  </div>
-                  {isExpanded && (
-                    <div className="min-w-0 truncate">
-                      <span className="block text-sm truncate">Painel TV da Sala</span>
-                      <span className="text-[10px] text-emerald-200/70 font-normal block truncate">
-                        Exibição Operacional
-                      </span>
+              {/* Item 5: Painel TV da Sala (Oculto para técnicos; acesso direto para DEV e TV) */}
+              {!isTech && (
+                <button
+                  onClick={handleTvClick}
+                  title="Painel TV da Sala (Telão Operacional)"
+                  className={`w-full rounded-2xl text-left text-xs font-bold transition-all flex items-center group bg-[#1a2c15] text-[#dfb642] hover:bg-[#233c1d] border border-[#cba135]/40 shadow-xs cursor-pointer ${
+                    isExpanded ? 'px-3.5 py-3 justify-between' : 'p-3 justify-center'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2 rounded-xl bg-[#27431e] text-[#dfb642] shrink-0">
+                      <Tv className="w-4 h-4" />
                     </div>
-                  )}
-                </div>
+                    {isExpanded && (
+                      <div className="min-w-0 truncate">
+                        <span className="block text-sm truncate">Painel TV da Sala</span>
+                        <span className="text-[10px] text-emerald-200/70 font-normal block truncate">
+                          Exibição Operacional
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                {isExpanded && (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black uppercase bg-[#dfb642] text-[#192b14] shrink-0 ml-1">
-                    TELÃO
-                  </span>
-                )}
-              </button>
+                  {isExpanded && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black uppercase bg-[#dfb642] text-[#192b14] shrink-0 ml-1">
+                      TELÃO
+                    </span>
+                  )}
+                </button>
+              )}
             </nav>
           </div>
 
@@ -493,7 +496,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* Rodapé da Barra Lateral: Sessão & Acessibilidade */}
-        <div className={`p-3 border-t border-[#2d4a22] bg-[#1a2c15] space-y-2.5 ${
+        <div className={`p-3 border-t border-[#2d4a22] bg-[#1a2c15] space-y-2.5 mt-auto shrink-0 w-full ${
           !isExpanded ? 'flex flex-col items-center' : ''
         }`}>
           

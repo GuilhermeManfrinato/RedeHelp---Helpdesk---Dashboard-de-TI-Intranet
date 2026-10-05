@@ -70,7 +70,7 @@ const DEFAULT_INTRANET_LINKS: IntranetLink[] = [
     title: 'Portal CTI / Suporte Local 2º GAC',
     url: 'http://10.24.0.10/suporte',
     category: 'Seção de TI',
-    description: 'Servidor local da Seção de Informática e Telemática do Regimento.',
+    description: 'Servidor local da Seção de Informática & TI do Regimento.',
   },
   {
     id: 'link-7',

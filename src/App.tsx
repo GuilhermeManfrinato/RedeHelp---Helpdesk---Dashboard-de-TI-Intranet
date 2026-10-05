@@ -25,6 +25,7 @@ import {
   LoanMessage,
   Mission,
   MissionPriority,
+  MissionArea,
   AdminTab
 } from './types';
 import { 
@@ -136,6 +137,53 @@ export default function App() {
       setMissions,
       setAuditLogs,
     });
+  }, []);
+
+  // Polling contínuo em background para sincronização em tempo real entre múltiplos dispositivos (PC e Celular)
+  useEffect(() => {
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const [freshTickets, freshLoans, freshMissions] = await Promise.all([
+          api.getTickets().catch(() => null),
+          api.getNotebookLoans().catch(() => null),
+          api.getMissions().catch(() => null),
+        ]);
+        if (!isMounted) return;
+
+        if (freshTickets) {
+          setTickets(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(freshTickets)) {
+              return freshTickets;
+            }
+            return prev;
+          });
+        }
+        if (freshLoans) {
+          setNotebookLoans(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(freshLoans)) {
+              return freshLoans;
+            }
+            return prev;
+          });
+        }
+        if (freshMissions) {
+          setMissions(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(freshMissions)) {
+              return freshMissions;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        // Silêncio em falha transitória de polling
+      }
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Salvar no localStorage quando o estado mudar
@@ -302,11 +350,20 @@ export default function App() {
     });
   };
 
-  // Handler: Mudar prioridade do chamado
+  // Handler: Mudar prioridade do chamado (Preservando histórico e persistindo no banco)
   const handleUpdateTicketPriority = (ticketId: string, newPriority: Priority) => {
     const ticketTarget = tickets.find(t => t.id === ticketId);
     const newSla = newPriority === 'critica' ? 1 : newPriority === 'alta' ? 2 : newPriority === 'media' ? 4 : 24;
     const author = currentUser?.name || 'Militar da TI';
+
+    const newHistoryItem = {
+      id: `h-${Date.now()}`,
+      date: new Date().toISOString(),
+      author,
+      action: `Prioridade ajustada para: ${newPriority.toUpperCase()} (SLA: ${newSla}h)`,
+    };
+
+    const updatedHistory = [...(ticketTarget?.history || []), newHistoryItem];
 
     setTickets(prev => prev.map(t => {
       if (t.id !== ticketId) return t;
@@ -315,20 +372,13 @@ export default function App() {
         priority: newPriority,
         slaLimitHours: newSla,
         updatedAt: new Date().toISOString(),
-        history: [
-          ...t.history,
-          {
-            id: `h-${Date.now()}`,
-            date: new Date().toISOString(),
-            author,
-            action: `Prioridade ajustada para: ${newPriority.toUpperCase()} (SLA: ${newSla}h)`,
-          }
-        ]
+        history: updatedHistory
       };
     }));
 
-    api.updateTicket(ticketId, { priority: newPriority, slaLimitHours: newSla }).catch(err => {
-      console.warn('[API] Erro ao atualizar prioridade no banco:', err);
+    api.updateTicketPriority(ticketId, newPriority, author).catch(err => {
+      console.warn('[API] Falha em updateTicketPriority, tentando updateTicket fallback:', err);
+      api.updateTicket(ticketId, { priority: newPriority, slaLimitHours: newSla, history: updatedHistory }).catch(console.error);
     });
 
     handleAddAuditLog({
@@ -347,27 +397,29 @@ export default function App() {
     const oldTitle = ticketTarget?.title || '';
     const author = currentUser?.name || 'Militar da TI';
 
+    const newHistoryItem = {
+      id: `h-${Date.now()}`,
+      date: new Date().toISOString(),
+      author,
+      action: `Título do chamado renomeado`,
+      comment: `Anterior: "${oldTitle}" → Novo: "${newTitle.trim()}"`,
+    };
+
+    const updatedHistory = [...(ticketTarget?.history || []), newHistoryItem];
+
     setTickets(prev => prev.map(t => {
       if (t.id !== ticketId) return t;
       return {
         ...t,
         title: newTitle.trim(),
         updatedAt: new Date().toISOString(),
-        history: [
-          ...t.history,
-          {
-            id: `h-${Date.now()}`,
-            date: new Date().toISOString(),
-            author,
-            action: `Título do chamado renomeado`,
-            comment: `Anterior: "${oldTitle}" → Novo: "${newTitle.trim()}"`,
-          }
-        ]
+        history: updatedHistory
       };
     }));
 
-    api.updateTicket(ticketId, { title: newTitle.trim() }).catch(err => {
-      console.warn('[API] Erro ao atualizar título no banco:', err);
+    api.updateTicketTitle(ticketId, newTitle.trim(), author).catch(err => {
+      console.warn('[API] Erro ao atualizar título no banco, tentando fallback:', err);
+      api.updateTicket(ticketId, { title: newTitle.trim(), history: updatedHistory }).catch(console.error);
     });
 
     handleAddAuditLog({
@@ -384,26 +436,36 @@ export default function App() {
   // Handler: Alterar informações completas do card (título, descrição, prioridade, seção, técnico)
   const handleUpdateTicketCard = (ticketId: string, updates: Partial<Ticket>) => {
     const author = currentUser?.name || 'Militar da TI';
+    const ticketTarget = tickets.find(t => t.id === ticketId);
+    if (!ticketTarget) return;
+
+    let effectiveUpdates = { ...updates };
+    // Regra estrita: se tiver alguém designado, obrigatoriamente status deve ser "em_atendimento"
+    if (effectiveUpdates.technicianId && ticketTarget.status !== 'resolvido' && ticketTarget.status !== 'cancelado') {
+      effectiveUpdates.status = 'em_atendimento';
+    }
+
+    const newHistoryItem = {
+      id: `h-${Date.now()}`,
+      date: new Date().toISOString(),
+      author,
+      action: 'Informações do card alteradas na TI',
+      comment: effectiveUpdates.title ? `Título: "${effectiveUpdates.title}"` : undefined,
+    };
+
+    const updatedHistory = [...ticketTarget.history, newHistoryItem];
+
     setTickets(prev => prev.map(t => {
       if (t.id !== ticketId) return t;
       return {
         ...t,
-        ...updates,
+        ...effectiveUpdates,
         updatedAt: new Date().toISOString(),
-        history: [
-          ...t.history,
-          {
-            id: `h-${Date.now()}`,
-            date: new Date().toISOString(),
-            author,
-            action: 'Informações do card alteradas na TI',
-            comment: updates.title ? `Título: "${updates.title}"` : undefined,
-          }
-        ]
+        history: updatedHistory
       };
     }));
 
-    api.updateTicket(ticketId, updates).catch(err => {
+    api.updateTicket(ticketId, { ...effectiveUpdates, history: updatedHistory }).catch(err => {
       console.warn('[API] Erro ao atualizar dados do card no banco:', err);
     });
 
@@ -412,8 +474,8 @@ export default function App() {
       militaryLogin: currentUser?.username || 'ti',
       role: currentUser?.role || 'CH-SECINFO',
       actionType: 'EDITAR_TITULO_CHAMADO',
-      summary: `Alterou informações do card do chamado ${ticketId}`,
-      targetRef: ticketId,
+      summary: `Alterou informações do card do chamado ${ticketTarget.code || ticketId}`,
+      targetRef: ticketTarget.code || ticketId,
     });
   };
 
@@ -442,6 +504,7 @@ export default function App() {
     title: string;
     description: string;
     priority: MissionPriority;
+    area?: MissionArea;
     assignedTechnicianIds: string[];
     deadline?: string;
     checklistItems: string[];
@@ -457,6 +520,7 @@ export default function App() {
       title: missionData.title,
       description: missionData.description,
       priority: missionData.priority,
+      area: missionData.area || 'geral',
       status: 'pendente',
       assignedTechnicianIds: missionData.assignedTechnicianIds,
       createdBy,
@@ -666,24 +730,38 @@ export default function App() {
     const ticketTarget = tickets.find(t => t.id === ticketId);
     const author = currentUser?.name || 'Xerife da TI';
 
+    // Regra estrita: todo chamado com alguém designado obrigatoriamente está EM ANDAMENTO (a menos que já resolvido ou cancelado)
+    const shouldBeEmAtendimento = !!technicianId && ticketTarget?.status !== 'resolvido' && ticketTarget?.status !== 'cancelado';
+    const newStatus = shouldBeEmAtendimento ? 'em_atendimento' : (ticketTarget?.status || 'aberto');
+
+    const newHistoryItem = {
+      id: `h-${Date.now()}`,
+      date: new Date().toISOString(),
+      author,
+      action: tech ? `Atribuído ao técnico: ${tech.name}` : 'Militar desvinculado',
+    };
+
+    const updatedHistory = [...(ticketTarget?.history || []), newHistoryItem];
+
     setTickets(prev => prev.map(t => {
       if (t.id !== ticketId) return t;
       return {
         ...t,
         technicianId: technicianId || null,
-        status: t.status === 'aberto' ? 'em_atendimento' : t.status,
+        status: newStatus,
         updatedAt: new Date().toISOString(),
-        history: [
-          ...t.history,
-          {
-            id: `h-${Date.now()}`,
-            date: new Date().toISOString(),
-            author,
-            action: tech ? `Atribuído ao técnico: ${tech.name}` : 'Militar desvinculado',
-          }
-        ]
+        history: updatedHistory
       };
     }));
+
+    api.assignTechnician(ticketId, technicianId, author, tech?.name).catch(err => {
+      console.warn('[API] Erro ao atribuir técnico no banco, tentando fallback:', err);
+      api.updateTicket(ticketId, {
+        technicianId: technicianId || null,
+        status: newStatus,
+        history: updatedHistory
+      } as any).catch(console.error);
+    });
 
     handleAddAuditLog({
       militaryName: currentUser?.name || 'Xerife da TI',
@@ -697,26 +775,32 @@ export default function App() {
     });
   };
 
-  // Handler: Adicionar despacho técnico
+  // Handler: Adicionar despacho técnico (Sincronizado e persistido no banco)
   const handleAddTicketHistory = (ticketId: string, comment: string, author: string) => {
     const ticketTarget = tickets.find(t => t.id === ticketId);
+    const newHistoryItem = {
+      id: `h-${Date.now()}`,
+      date: new Date().toISOString(),
+      author,
+      action: 'Despacho Técnico',
+      comment,
+    };
+
+    const updatedHistory = [...(ticketTarget?.history || []), newHistoryItem];
+
     setTickets(prev => prev.map(t => {
       if (t.id !== ticketId) return t;
       return {
         ...t,
         updatedAt: new Date().toISOString(),
-        history: [
-          ...t.history,
-          {
-            id: `h-${Date.now()}`,
-            date: new Date().toISOString(),
-            author,
-            action: 'Despacho Técnico',
-            comment,
-          }
-        ]
+        history: updatedHistory
       };
     }));
+
+    api.addTicketHistory(ticketId, comment, author).catch(err => {
+      console.warn('[API] Erro ao registrar despacho no banco, tentando fallback:', err);
+      api.updateTicket(ticketId, { history: updatedHistory } as any).catch(console.error);
+    });
 
     handleAddAuditLog({
       militaryName: currentUser?.name || author,
@@ -988,6 +1072,15 @@ export default function App() {
     }));
   };
 
+  // Handler: Abrir Modo TV (exclusivo para login CH-TVINFO ou DEV)
+  const handleOpenTvMode = () => {
+    if (currentUser?.role === 'CH-TVINFO' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev') {
+      setIsTvModeOpen(true);
+    } else {
+      alert('Acesso ao Modo Painel TV é restrito à conta da TV (CH-TVINFO) ou DEV.');
+    }
+  };
+
   // Alternar militar na sessão (para testar permissões)
   const handleSwitchUser = (user: MilitaryUser) => {
     setCurrentUser(user);
@@ -1036,7 +1129,7 @@ export default function App() {
             techniciansCount={militaryUsers.length}
             missionsCount={openMissionsCount}
             unreadMessagesCount={unreadMessagesCount}
-            onOpenTvMode={() => setIsTvModeOpen(true)}
+            onOpenTvMode={handleOpenTvMode}
             onLogoutAdmin={handleAdminLogout}
             onNavigateToClient={navigateToClient}
             a11y={a11y}
@@ -1052,10 +1145,17 @@ export default function App() {
               adminTab={adminTab}
               onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
               unreadMessagesCount={unreadMessagesCount}
-              onOpenTvMode={() => setIsTvModeOpen(true)}
+              onOpenTvMode={handleOpenTvMode}
               onLogoutAdmin={handleAdminLogout}
               criticalCount={criticalCount}
               currentUser={currentUser}
+              tickets={tickets}
+              departments={departments}
+              onOpenTicketWithDoubts={() => {
+                setAdminTab('it');
+              }}
+              a11y={a11y}
+              onUpdateA11y={setA11y}
             />
 
             <main className="flex-1">
@@ -1136,10 +1236,10 @@ export default function App() {
               <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                   <span className="font-bold text-[#dfb642]">
-                    2º GAC - REGIMENTO DEODORO
+                    2º GAC
                   </span>
                   <span>·</span>
-                  <span>Seção de Informática & Telemática</span>
+                  <span>Seção de Informática & TI</span>
                   <span>·</span>
                   <span className="font-mono text-emerald-300">BRAÇO FORTE, MÃO AMIGA</span>
                 </div>
@@ -1166,7 +1266,14 @@ export default function App() {
 
               {/* Linha de Crédito Oficial */}
               <div className="mt-2 pt-2 border-t border-[#27431e]/60 flex items-center justify-center text-[11px] font-mono text-emerald-300/80">
-                desenvolvido com &lt;3 por Manfrinato | INFO/26
+                <a
+                  href="https://linkedin.com/in/manfrinato"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#dfb642] hover:underline transition-colors"
+                >
+                  desenvolvido com &lt;3 por Manfrinato | INFO/26
+                </a>
               </div>
             </footer>
           </div>
@@ -1210,6 +1317,8 @@ export default function App() {
                 onLoginSuccess={handleAdminLoginSuccess}
                 onGoBackToPortal={navigateToClient}
                 a11y={a11y}
+                onUpdateMilitaryUsers={setMilitaryUsers}
+                onAddAuditLog={handleAddAuditLog}
               />
             )}
           </main>
@@ -1223,10 +1332,10 @@ export default function App() {
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                 <span className="font-bold text-[#dfb642]">
-                  2º GAC - REGIMENTO DEODORO
+                  2º GAC
                 </span>
                 <span>·</span>
-                <span>Seção de Informática & Telemática</span>
+                <span>Seção de Informática & TI</span>
                 <span>·</span>
                 <span className="font-mono text-emerald-300">BRAÇO FORTE, MÃO AMIGA</span>
               </div>
@@ -1275,7 +1384,14 @@ export default function App() {
 
             {/* Linha de Crédito Oficial */}
             <div className="mt-2 pt-2 border-t border-[#27431e]/60 flex items-center justify-center text-[11px] font-mono text-emerald-300/80">
-              desenvolvido com &lt;3 por Manfrinato{!(isAdminRoute && !isAdminAuthenticated) ? ' | INFO/26' : ''}
+              <a
+                href="https://linkedin.com/in/manfrinato"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[#dfb642] hover:underline transition-colors"
+              >
+                desenvolvido com &lt;3 por Manfrinato{!(isAdminRoute && !isAdminAuthenticated) ? ' | INFO/26' : ''}
+              </a>
             </div>
           </footer>
         </div>

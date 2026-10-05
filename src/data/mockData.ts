@@ -237,7 +237,7 @@ export const initialMilitaryUsers: MilitaryUser[] = [
     role: 'CH-SECINFO',
     active: true,
     email: 'dasdeves@eb.mil.br',
-    specialty: 'Chefe da Seção de Informática & Telemática (CHSECINFO)',
+    specialty: 'Chefe da Seção de Informática & TI (CHSECINFO)',
     createdAt: new Date().toISOString(),
   },
   {
@@ -250,7 +250,7 @@ export const initialMilitaryUsers: MilitaryUser[] = [
     role: 'CH-SECINFO',
     active: true,
     email: 'cavalcanti@eb.mil.br',
-    specialty: 'Chefe da Seção de Informática & Telemática (CHSECINFO)',
+    specialty: 'Chefe da Seção de Informática & TI (CHSECINFO)',
     createdAt: new Date().toISOString(),
   },
   {

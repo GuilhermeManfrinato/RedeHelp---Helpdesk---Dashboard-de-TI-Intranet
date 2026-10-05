@@ -112,12 +112,12 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
   // Inicializar o roster quando abre
   useEffect(() => {
     if (isOpen) {
-      const activeUsers = militaryUsers.filter(u => u.active !== false);
+      const activeUsers = (militaryUsers || []).filter(u => u && u.active !== false);
       const initialRoster: AttendanceRosterItem[] = activeUsers.map(u => ({
-        militaryId: u.id,
-        militaryName: u.name,
-        warName: u.warName,
-        rank: u.rank,
+        militaryId: u.id || `mil-${Math.random()}`,
+        militaryName: u.name || 'Militar',
+        warName: u.warName || u.name || 'Militar',
+        rank: u.rank || 'Mil',
         status: 'PRESENTE',
         reason: '',
       }));
@@ -129,9 +129,9 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
   const loadRecords = async () => {
     try {
       const data = await api.getAttendanceRecords();
-      setRecords(data);
+      setRecords(Array.isArray(data) ? data : []);
     } catch {
-      // Fallback
+      setRecords([]);
     }
   };
 
@@ -209,7 +209,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const filteredHistoryRecords = records.filter(r => {
+  const filteredHistoryRecords = (Array.isArray(records) ? records : []).filter(r => {
     if (queryDate && r.date !== queryDate) return false;
     return true;
   });
@@ -235,7 +235,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-black uppercase tracking-wider text-[#1e3316] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  2º GAC · Regimento Deodoro
+                  2º GAC
                 </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#dfb642] text-[#192b14]">
                   Seção de Informática & TI
@@ -389,14 +389,14 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-xs font-mono font-bold text-slate-400 w-5">{idx + 1}.</span>
                       <div className="w-8 h-8 rounded-lg bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center justify-center font-mono shrink-0">
-                        {item.warName.slice(0, 2).toUpperCase()}
+                        {(item.warName || item.militaryName || 'MI').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="truncate">
                         <strong className="text-xs font-bold text-slate-900 block truncate">
                           {item.militaryName}
                         </strong>
                         <span className="text-[10px] text-slate-500 font-mono">
-                          Nome de Guerra: {item.warName}
+                          Nome de Guerra: {item.warName || item.militaryName}
                         </span>
                       </div>
                     </div>
@@ -560,17 +560,17 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
 
                     {/* Grade de Militares da Formatura */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-[11px]">
-                      {record.roster?.map((m) => {
+                      {record.roster?.map((m, idx) => {
                         const cfg = STATUS_CONFIG[m.status] || STATUS_CONFIG.PRESENTE;
                         return (
                           <div 
-                            key={m.militaryId}
+                            key={m.militaryId || idx}
                             className={`p-2 rounded-lg border flex items-center justify-between gap-1.5 ${
                               m.status === 'PRESENTE' ? 'bg-slate-50 border-slate-200' : 'bg-red-50/60 border-red-200'
                             }`}
                           >
                             <span className="font-semibold text-slate-800 truncate">
-                              {m.rank} {m.warName}
+                              {m.rank || ''} {m.warName || m.militaryName || 'Militar'}
                             </span>
                             <div className="flex items-center gap-1 shrink-0">
                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${cfg.badge}`}>

@@ -154,6 +154,8 @@ export interface MissionNote {
   createdAt: string;
 }
 
+export type MissionArea = 'redes' | 'desenvolvimento' | 'hardware' | 'geral';
+
 export interface Mission {
   id: string;
   code: string; // Ex: "MISSAO-101"
@@ -161,6 +163,7 @@ export interface Mission {
   description: string;
   priority: MissionPriority;
   status: MissionStatus;
+  area?: MissionArea;
   assignedTechnicianIds: string[];
   createdBy: string;
   createdByRole: string;
@@ -170,6 +173,8 @@ export interface Mission {
   completedAt?: string;
   checklist?: MissionChecklistItem[];
   notes?: MissionNote[];
+  isTopPriority?: boolean;
+  priorityDesignatedBy?: string;
 }
 
 export interface LoanHistoryItem {

@@ -68,7 +68,18 @@ app.put('/api/tickets/:id', async (req, res) => {
     const { id } = req.params;
     const ticket = await TicketModel.findByPk(id);
     if (!ticket) return res.status(404).json({ error: 'Chamado não encontrado' });
-    await ticket.update(req.body);
+    
+    const updateData = { ...req.body };
+    if (updateData.history === undefined) {
+      delete updateData.history;
+    }
+    const currentStatus = (ticket as any).status;
+    const finalTechId = updateData.technicianId !== undefined ? updateData.technicianId : (ticket as any).technicianId;
+    if (finalTechId && currentStatus !== 'resolvido' && currentStatus !== 'cancelado' && !updateData.status) {
+      updateData.status = 'em_atendimento';
+    }
+
+    await ticket.update(updateData);
     res.json(ticket);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -205,7 +216,10 @@ app.patch('/api/tickets/:id/assign', async (req, res) => {
     if (!ticket) return res.status(404).json({ error: 'Chamado não encontrado' });
 
     const currentHistory = (ticket as any).history || [];
-    const newStatus = (ticket as any).status === 'aberto' ? 'em_atendimento' : (ticket as any).status;
+    const currentStatus = (ticket as any).status;
+    const newStatus = (technicianId && currentStatus !== 'resolvido' && currentStatus !== 'cancelado')
+      ? 'em_atendimento'
+      : (technicianId ? currentStatus : (currentStatus === 'em_atendimento' ? 'aberto' : currentStatus));
 
     const newHistoryItem = {
       id: `h-${Date.now()}`,

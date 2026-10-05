@@ -232,7 +232,7 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
 
         {/* Rodapé */}
         <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
-          <span>Seção de Informática & Telemática (INFO/26)</span>
+          <span>Seção de Informática & TI (INFO/26)</span>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-white border border-slate-300 font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"

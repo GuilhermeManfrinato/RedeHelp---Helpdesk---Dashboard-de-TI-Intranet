@@ -22,7 +22,8 @@ import {
   MessageSquare,
   Send,
   Download,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { Ticket, Department, Category, AccessibilitySettings, Priority } from '../types';
 import { generateTicketPdf } from '../utils/ticketPdf';
@@ -141,12 +142,21 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
     setSearchedCode(searchCodeInput.trim());
   };
 
-  // Busca instantânea automática: quando o usuário termina de digitar o código, puxa o chamado automaticamente
-  const cleanInput = searchCodeInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const foundTicket = cleanInput
+  // Busca instantânea automática:
+  // Se o usuário digitar apenas "TICKET" sem números, não busca nada. Só preenche quando colocar os dígitos do chamado.
+  const rawInput = searchCodeInput.trim().toUpperCase();
+  const digitsOnly = rawInput.replace(/\D/g, '');
+  const hasDigits = digitsOnly.length > 0;
+  const cleanInput = rawInput.replace(/[^A-Z0-9]/g, '');
+
+  const foundTicket = hasDigits
     ? tickets.find(t => {
         const cleanCode = t.code.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        return cleanCode === cleanInput || cleanCode.endsWith(cleanInput) || (cleanInput.length >= 3 && cleanCode.includes(cleanInput));
+        const ticketDigits = t.code.replace(/\D/g, '');
+        if (cleanCode === cleanInput) return true;
+        if (digitsOnly.length >= 2 && ticketDigits.endsWith(digitsOnly)) return true;
+        if (cleanInput.length >= 3 && cleanCode.endsWith(cleanInput)) return true;
+        return false;
       })
     : null;
 
@@ -163,10 +173,10 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded text-[11px] font-mono font-black uppercase tracking-widest bg-[#dfb642] text-[#192b14]">
-                2º GAC - REGIMENTO DEODORO
+                2º GAC
               </span>
               <span className="text-xs text-emerald-200/80 font-mono">
-                Seção de Informática & Telemática
+                Seção de Informática & TI
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
@@ -671,49 +681,48 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
               Consultar Andamento do Chamado
             </h2>
             <p className="text-sm text-slate-600 mb-6">
-              Para acompanhar o andamento, digite o <strong>código do seu chamado</strong> presente no comprovante de abertura (ex: <code className="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-[#1e3316]">TICKET-1001</code>). Ao digitar, o sistema localiza e carrega os dados automaticamente.
+              Para acompanhar o andamento, digite o <strong>número do seu chamado</strong> presente no comprovante de abertura (ex: <code className="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-[#1e3316]">1001</code> ou <code className="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-[#1e3316]">TICKET-1001</code>). Ao digitar o número, o sistema localiza e carrega os dados automaticamente sem necessidade de clicar em botões.
             </p>
 
-            <form onSubmit={handleSearchByCode} className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  placeholder="Digite o código do chamado (ex: TICKET-1001 ou 1001)..."
-                  value={searchCodeInput}
-                  onChange={(e) => setSearchCodeInput(e.target.value)}
-                  className={`w-full pl-13 pr-4 py-4 rounded-2xl border text-lg font-mono font-bold uppercase focus:ring-2 focus:ring-[#27431e] ${
-                    a11y.highContrast
-                      ? 'bg-black border-yellow-400 text-white'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white'
-                  }`}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="py-4 px-8 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black text-base flex items-center justify-center gap-2 hover:bg-[#27431e] transition-colors shadow-md border border-[#cba135]/50 whitespace-nowrap cursor-pointer"
-              >
-                <span>Consultar</span>
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </form>
+            <div className="relative w-full">
+              <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Digite o número do chamado (ex: 1001 ou TICKET-1001)..."
+                value={searchCodeInput}
+                onChange={(e) => setSearchCodeInput(e.target.value)}
+                className={`w-full pl-13 pr-12 py-4 rounded-2xl border text-lg font-mono font-bold uppercase focus:ring-2 focus:ring-[#27431e] ${
+                  a11y.highContrast
+                    ? 'bg-black border-yellow-400 text-white'
+                    : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white'
+                }`}
+              />
+              {searchCodeInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchCodeInput('')}
+                  title="Limpar campo"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Estado 1: Quando ainda não foi digitado nada */}
-          {!searchCodeInput.trim() && (
+          {/* Estado 1: Quando ainda não foi digitado número */}
+          {!hasDigits && (
             <div className="p-10 text-center rounded-3xl bg-white border border-slate-200/80 text-slate-500 space-y-2">
               <Search className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="font-bold text-base text-slate-700">Aguardando código do chamado...</p>
+              <p className="font-bold text-base text-slate-700">Aguardando número do chamado...</p>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Digite o número do seu chamado acima. O sistema localizará e puxará as informações da ocorrência automaticamente.
+                Digite os dígitos do seu chamado acima (ex: <code className="font-mono font-bold text-[#1e3316]">1001</code> ou <code className="font-mono font-bold text-[#1e3316]">TICKET-1001</code>). O sistema puxará os dados instantaneamente.
               </p>
             </div>
           )}
 
-          {/* Estado 2: Quando foi digitado algo mas não encontrou */}
-          {searchCodeInput.trim().length >= 2 && !foundTicket && (
+          {/* Estado 2: Quando foi digitado número mas não encontrou */}
+          {hasDigits && !foundTicket && (
             <div className="p-10 text-center rounded-3xl bg-white border border-red-200 text-slate-600 space-y-3">
               <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
                 <AlertTriangle className="w-6 h-6" />
@@ -722,7 +731,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                 Chamado não localizado
               </h3>
               <p className="text-sm text-slate-600 max-w-md mx-auto">
-                Nenhum chamado foi encontrado com o código <strong className="font-mono text-red-600">"{searchCodeInput.trim()}"</strong>. Certifique-se de digitar o número que consta no seu comprovante.
+                Nenhum chamado foi encontrado com o número <strong className="font-mono text-red-600">"{searchCodeInput.trim()}"</strong>. Certifique-se de digitar o número que consta no seu comprovante.
               </p>
             </div>
           )}
@@ -899,16 +908,30 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                               key={msg.id}
                               className={`flex flex-col ${msg.sender === 'solicitante' ? 'items-end' : 'items-start'}`}
                             >
-                              <div className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs ${
+                              <div className={`max-w-[90%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs ${
                                 msg.sender === 'solicitante'
                                   ? 'bg-[#1e3316] text-[#dfb642] rounded-br-xs shadow-xs'
                                   : 'bg-white border-2 border-[#cba135] text-slate-900 rounded-bl-xs shadow-sm'
                               }`}>
-                                <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-80 font-mono">
-                                  <span className="font-bold">
-                                    {msg.sender === 'solicitante' ? 'Você (Militar Solicitante)' : `Militar da TI: ${msg.senderName}`}
+                                <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-90 font-mono">
+                                  <span className="font-bold flex items-center gap-1.5 flex-wrap">
+                                    {msg.sender === 'solicitante' ? (
+                                      <>
+                                        <span className="inline-block px-1.5 py-0.5 rounded bg-[#dfb642] text-[#1e3316] font-black text-[9px] uppercase">
+                                          VOCÊ
+                                        </span>
+                                        <span>Militar Solicitante</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="inline-block px-1.5 py-0.5 rounded bg-[#1e3316] text-[#dfb642] font-black text-[9px] uppercase">
+                                          TI
+                                        </span>
+                                        <span className="text-[#1e3316] font-bold">{msg.senderName || 'Militar da TI'}</span>
+                                      </>
+                                    )}
                                   </span>
-                                  <span>
+                                  <span className="shrink-0 text-slate-400">
                                     {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                 </div>
@@ -926,7 +949,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                         <span className="text-[11px] font-bold text-slate-600 mb-1.5 block">
                           Perguntas Frequentes (Clique para enviar automaticamente):
                         </span>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1.5 w-full">
                           {[
                             'Como está o andamento do atendimento?',
                             'Tem previsão de término / conclusão?',
@@ -939,7 +962,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                               onClick={() => {
                                 onSendMessage(t.id, preset, 'solicitante', t.requesterName);
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 text-left"
+                              className="w-full sm:w-auto px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 text-xs font-semibold transition-all flex items-center gap-1.5 active:scale-95 text-left"
                             >
                               <span>💬</span>
                               <span>{preset}</span>
@@ -956,18 +979,18 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                           onSendMessage(t.id, clientChatInput.trim(), 'solicitante', t.requesterName);
                           setClientChatInput('');
                         }}
-                        className="flex gap-2 pt-1"
+                        className="flex flex-col sm:flex-row gap-2 pt-1 w-full"
                       >
                         <input
                           type="text"
                           placeholder="Digite sua dúvida ou mensagem para a Seção de TI..."
                           value={clientChatInput}
                           onChange={(e) => setClientChatInput(e.target.value)}
-                          className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-[#27431e]"
+                          className="w-full sm:flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white text-slate-900 focus:ring-2 focus:ring-[#27431e]"
                         />
                         <button
                           type="submit"
-                          className="px-4 py-2.5 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center gap-1.5 hover:bg-[#27431e] transition-colors border border-[#cba135] shadow-xs shrink-0"
+                          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center justify-center gap-1.5 hover:bg-[#27431e] transition-colors border border-[#cba135] shadow-xs shrink-0 cursor-pointer"
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>Enviar</span>

@@ -27,7 +27,9 @@ import {
   Radio,
   Lock,
   Sparkles,
-  Download
+  Download,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { Ticket, Department, Technician, Priority, TicketStatus, AccessibilitySettings, MilitaryUser } from '../types';
 import { generateTicketPdf } from '../utils/ticketPdf';
@@ -77,24 +79,34 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
   // Controle de Permissões baseado no Perfil Militar
   const userRole = currentUser?.role || 'CH-SECINFO';
   const isTV = userRole === 'CH-TVINFO';
-  const isTecnico = userRole === 'CH-TECNICOINFO';
-  const isXerife = userRole === 'CH-XERIFEINFO';
-  const isChefe = userRole === 'CH-SECINFO';
+  const isTecnico = userRole === 'CH-TECNICOINFO' || userRole === 'TECINFO';
+  const isXerife = userRole === 'CH-XERIFEINFO' || userRole === 'XERIFESECINFO';
+  const isChefe = userRole === 'CH-SECINFO' || userRole === 'CHSECINFO' || currentUser?.username === 'dev';
 
   // Regras estritas solicitadas:
   // CH-SECINFO: Chefe da Seção - Acesso irrestrito (único que pode excluir chamados definitivamente, editar tudo)
-  // CH-XERIFEINFO: Xerife da TI - Triagem operacional, atribuir técnicos, mudar prioridades, intervenção em massa, editar dados do card/título. NÃO exclui chamados!
-  // CH-TECNICOINFO: Técnico de Atendimento - Atende chamados, avança/muda status, responde dúvidas do solicitante, adiciona notas internas. NÃO exclui, NÃO altera dados cadastrais/título, NÃO altera prioridade, NÃO faz intervenção em massa.
+  // CH-XERIFEINFO: Xerife da TI - Triagem operacional, atribuir técnicos, mudar prioridades, mover cards no Kanban, intervenção em massa, editar dados do card/título. NÃO exclui chamados!
+  // CH-TECNICOINFO: Técnico de Atendimento - Atende chamados, responde dúvidas do solicitante, adiciona notas internas. NÃO move cards no Kanban, NÃO exclui, NÃO altera dados cadastrais/título, NÃO altera prioridade, NÃO faz intervenção em massa.
   // CH-TVINFO: Painel TV - Exclusivo para visualização ampliada na TV, sem nenhuma permissão de alteração ou interação.
   const canDelete = isChefe; // Apenas o Chefe da Seção pode excluir chamados
   const canEditTitle = isChefe || isXerife; // Apenas Chefe e Xerife podem renomear chamados
   const canEditCard = isChefe || isXerife; // Apenas Chefe e Xerife podem editar dados cadastrais do chamado
   const canAssignTech = isChefe || isXerife; // Apenas Chefe e Xerife distribuem/atribuem técnicos
   const canChangePriority = isChefe || isXerife; // Apenas Chefe e Xerife alteram prioridade
-  const canMassIntervene = isChefe || isXerife; // Intervenção em massa exclusiva de Chefe e Xerife
-  const canMoveStatus = !isTV; // Chefe, Xerife e Técnicos podem avançar/mudar status dos chamados
+  const canMassIntervene = isXerife; // Intervenção do Xerife: estritamente e exclusivamente para o Xerife!
+  const canMoveStatus = isXerife; // Apenas o Xerife da TI tem acesso especial para mover cards entre colunas no Kanban!
   const canReplyChat = !isTV; // Chefe, Xerife e Técnicos podem responder ao chat/dúvidas
   const canAddNotes = !isTV; // Chefe, Xerife e Técnicos podem despachar parecer técnico interno
+
+  // Estado para contrair / colapsar categorias / colunas do Kanban
+  const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({});
+
+  const toggleColumnCollapse = (statusKey: string) => {
+    setCollapsedColumns(prev => ({
+      ...prev,
+      [statusKey]: !prev[statusKey]
+    }));
+  };
 
   // Filtros
   const [selectedDeptId, setSelectedDeptId] = useState<string>('all');
@@ -557,15 +569,15 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
           </div>
         </div>
 
-        {/* Botão de Exibição Ampla na TV da Sala e Intervenção do Xerife */}
-        <div className="shrink-0 flex flex-wrap items-center gap-2.5">
-          {canMassIntervene && (
+        {/* Intervenção do Xerife (exclusivo para perfil Xerife) */}
+        {canMassIntervene && (
+          <div className="shrink-0 flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => {
                 setShowMassInterventionModal(true);
                 setMassInterventionText('');
               }}
-              className="px-4 py-3.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md border border-amber-700 transition-all active:scale-[0.99]"
+              className="px-4 py-3.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md border border-amber-700 transition-all active:scale-[0.99] cursor-pointer"
               title="Intervenção do Xerife: Enviar comunicado/despacho em massa para todos os chamados em aberto"
             >
               <Zap className="w-4 h-4 text-yellow-300" />
@@ -574,20 +586,8 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 <span className="text-[9px] text-amber-200 font-mono block mt-0.5">Despacho em Todos os Chamados</span>
               </div>
             </button>
-          )}
-
-          <button
-            onClick={onOpenTvMode}
-            className="w-full sm:w-auto px-5 py-4 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black text-sm flex items-center justify-center gap-2.5 hover:bg-[#27431e] transition-all shadow-md border-2 border-[#cba135] active:scale-[0.99]"
-            title="Abrir painel ampliado para televisão da Seção de TI"
-          >
-            <Tv className="w-5 h-5 text-[#dfb642]" />
-            <div className="text-left">
-              <span className="block leading-none">Painel TV da Sala</span>
-              <span className="text-[10px] text-emerald-200/80 font-normal font-mono block mt-0.5">Visão Ampla para Televisão</span>
-            </div>
-          </button>
-        </div>
+          </div>
+        )}
 
       </div>
 
@@ -794,6 +794,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
             {/* Coluna 1: Abertos / Triagem */}
             <div 
               onDragOver={(e) => {
+                if (!canMoveStatus) return;
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 if (dragOverColumn !== 'aberto') setDragOverColumn('aberto');
@@ -804,10 +805,13 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 }
               }}
               onDrop={(e) => {
+                if (!canMoveStatus) return;
                 e.preventDefault();
                 handleDropOnColumn('aberto');
               }}
-              className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[420px] ${
+              className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+                collapsedColumns['aberto'] ? 'min-h-[90px]' : 'min-h-[420px]'
+              } ${
                 mobileKanbanTab !== 'all' && mobileKanbanTab !== 'aberto' ? 'hidden sm:block' : 'block'
               } ${
                 dragOverColumn === 'aberto'
@@ -815,59 +819,86 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                   : 'bg-slate-100/70 border-slate-200'
               }`}
             >
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <span className="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#1e3316]"></span>
-                1. Abertos / Triagem
-              </span>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                {filteredTickets.filter(t => t.status === 'aberto').length}
-              </span>
-            </div>
-
-            {dragOverColumn === 'aberto' && (
-              <div className="p-3 text-center rounded-xl bg-white border border-[#27431e] text-xs font-bold text-[#1e3316] animate-pulse">
-                Solte aqui para retornar à Triagem
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {filteredTickets.filter(t => t.status === 'aberto').map(ticket => (
-                <KanbanTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  departments={departments}
-                  technicians={technicians}
-                  canAssign={canAssignTech}
-                  canDelete={canDelete}
-                  canEditTitle={canEditTitle}
-                  canEditCard={canEditCard}
-                  canMoveStatus={canMoveStatus}
-                  onClick={() => {
-                    setActiveTicket(ticket);
-                    onMarkMessagesAsRead(ticket.id);
-                  }}
-                  onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
-                  onQuickAdvance={() => {
-                    setReqTechnicianId(ticket.technicianId || technicians[0]?.id || '');
-                    setReqNote('');
-                    setDropRequirement({ ticket, targetStatus: 'em_atendimento' });
-                  }}
-                  onQuickResolve={() => handleQuickResolve(ticket)}
-                  onDelete={() => handleDeleteTicket(ticket)}
-                  onEditTitle={() => handleStartEditTitle(ticket)}
-                  onEditCard={() => handleOpenEditCard(ticket)}
-                  onDragStart={(e) => handleDragStart(e, ticket)}
-                />
-              ))}
-
-              {filteredTickets.filter(t => t.status === 'aberto').length === 0 && dragOverColumn !== 'aberto' && (
-                <div className="p-6 text-center text-xs text-slate-400 font-medium">
-                  Nenhum chamado aberto na triagem.
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span className="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#1e3316]"></span>
+                  1. Abertos / Triagem
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                    {filteredTickets.filter(t => t.status === 'aberto').length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleColumnCollapse('aberto')}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                    title={collapsedColumns['aberto'] ? 'Expandir coluna' : 'Contrair coluna'}
+                  >
+                    {collapsedColumns['aberto'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
+              </div>
+
+              {collapsedColumns['aberto'] ? (
+                <div 
+                  onClick={() => toggleColumnCollapse('aberto')}
+                  className="py-4 text-center cursor-pointer hover:bg-slate-200/50 rounded-xl transition-colors space-y-1"
+                  title="Clique para expandir"
+                >
+                  <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                    Contraído ({filteredTickets.filter(t => t.status === 'aberto').length})
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-semibold block hover:underline">
+                    Expandir ▾
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {dragOverColumn === 'aberto' && (
+                    <div className="p-3 text-center rounded-xl bg-white border border-[#27431e] text-xs font-bold text-[#1e3316] animate-pulse">
+                      Solte aqui para retornar à Triagem
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {filteredTickets.filter(t => t.status === 'aberto').map(ticket => (
+                      <KanbanTicketCard
+                        key={ticket.id}
+                        ticket={ticket}
+                        departments={departments}
+                        technicians={technicians}
+                        canAssign={canAssignTech}
+                        canDelete={canDelete}
+                        canEditTitle={canEditTitle}
+                        canEditCard={canEditCard}
+                        canMoveStatus={canMoveStatus}
+                        onClick={() => {
+                          setActiveTicket(ticket);
+                          onMarkMessagesAsRead(ticket.id);
+                        }}
+                        onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
+                        onQuickAdvance={() => {
+                          setReqTechnicianId(ticket.technicianId || technicians[0]?.id || '');
+                          setReqNote('');
+                          setDropRequirement({ ticket, targetStatus: 'em_atendimento' });
+                        }}
+                        onQuickResolve={() => handleQuickResolve(ticket)}
+                        onDelete={() => handleDeleteTicket(ticket)}
+                        onEditTitle={() => handleStartEditTitle(ticket)}
+                        onEditCard={() => handleOpenEditCard(ticket)}
+                        onDragStart={(e) => handleDragStart(e, ticket)}
+                      />
+                    ))}
+
+                    {filteredTickets.filter(t => t.status === 'aberto').length === 0 && dragOverColumn !== 'aberto' && (
+                      <div className="p-6 text-center text-xs text-slate-400 font-medium">
+                        Nenhum chamado aberto na triagem.
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
-          </div>
 
           {/* Coluna 2: Em Atendimento */}
           <div 
@@ -887,7 +918,9 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
               e.preventDefault();
               handleDropOnColumn('em_atendimento');
             }}
-            className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[420px] ${
+            className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+              collapsedColumns['em_atendimento'] ? 'min-h-[90px]' : 'min-h-[420px]'
+            } ${
               mobileKanbanTab !== 'all' && mobileKanbanTab !== 'em_atendimento' ? 'hidden sm:block' : 'block'
             } ${
               dragOverColumn === 'em_atendimento'
@@ -900,52 +933,79 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-600"></span>
                 2. Em Atendimento
               </span>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                {filteredTickets.filter(t => t.status === 'em_atendimento').length}
-              </span>
-            </div>
-
-            {dragOverColumn === 'em_atendimento' && (
-              <div className="p-3 text-center rounded-xl bg-white border border-amber-600 text-xs font-bold text-amber-900 animate-pulse">
-                Solte aqui para Iniciar Atendimento
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                  {filteredTickets.filter(t => t.status === 'em_atendimento').length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => toggleColumnCollapse('em_atendimento')}
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                  title={collapsedColumns['em_atendimento'] ? 'Expandir coluna' : 'Contrair coluna'}
+                >
+                  {collapsedColumns['em_atendimento'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
               </div>
-            )}
-
-            <div className="space-y-3">
-              {filteredTickets.filter(t => t.status === 'em_atendimento').map(ticket => (
-                <KanbanTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  departments={departments}
-                  technicians={technicians}
-                  canAssign={canAssignTech}
-                  canDelete={canDelete}
-                  canEditTitle={canEditTitle}
-                  canEditCard={canEditCard}
-                  canMoveStatus={canMoveStatus}
-                  onClick={() => {
-                    setActiveTicket(ticket);
-                    onMarkMessagesAsRead(ticket.id);
-                  }}
-                  onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
-                  onQuickAdvance={() => {
-                    setReqNote('Atendimento técnico concluído com sucesso pela Seção de TI.');
-                    setDropRequirement({ ticket, targetStatus: 'resolvido' });
-                  }}
-                  onQuickResolve={() => handleQuickResolve(ticket)}
-                  onDelete={() => handleDeleteTicket(ticket)}
-                  onEditTitle={() => handleStartEditTitle(ticket)}
-                  onEditCard={() => handleOpenEditCard(ticket)}
-                  onDragStart={(e) => handleDragStart(e, ticket)}
-                />
-              ))}
-
-              {filteredTickets.filter(t => t.status === 'em_atendimento').length === 0 && dragOverColumn !== 'em_atendimento' && (
-                <div className="p-6 text-center text-xs text-slate-400 font-medium">
-                  Nenhum chamado em atendimento no momento.
-                </div>
-              )}
             </div>
+
+            {collapsedColumns['em_atendimento'] ? (
+              <div 
+                onClick={() => toggleColumnCollapse('em_atendimento')}
+                className="py-4 text-center cursor-pointer hover:bg-slate-200/50 rounded-xl transition-colors space-y-1"
+                title="Clique para expandir"
+              >
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                  Contraído ({filteredTickets.filter(t => t.status === 'em_atendimento').length})
+                </span>
+                <span className="text-[10px] text-amber-700 font-semibold block hover:underline">
+                  Expandir ▾
+                </span>
+              </div>
+            ) : (
+              <>
+                {dragOverColumn === 'em_atendimento' && (
+                  <div className="p-3 text-center rounded-xl bg-white border border-amber-600 text-xs font-bold text-amber-900 animate-pulse">
+                    Solte aqui para Iniciar Atendimento
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {filteredTickets.filter(t => t.status === 'em_atendimento').map(ticket => (
+                    <KanbanTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      departments={departments}
+                      technicians={technicians}
+                      canAssign={canAssignTech}
+                      canDelete={canDelete}
+                      canEditTitle={canEditTitle}
+                      canEditCard={canEditCard}
+                      canMoveStatus={canMoveStatus}
+                      onClick={() => {
+                        setActiveTicket(ticket);
+                        onMarkMessagesAsRead(ticket.id);
+                      }}
+                      onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
+                      onQuickAdvance={() => {
+                        setReqNote('Atendimento técnico concluído com sucesso pela Seção de TI.');
+                        setDropRequirement({ ticket, targetStatus: 'resolvido' });
+                      }}
+                      onQuickResolve={() => handleQuickResolve(ticket)}
+                      onDelete={() => handleDeleteTicket(ticket)}
+                      onEditTitle={() => handleStartEditTitle(ticket)}
+                      onEditCard={() => handleOpenEditCard(ticket)}
+                      onDragStart={(e) => handleDragStart(e, ticket)}
+                    />
+                  ))}
+
+                  {filteredTickets.filter(t => t.status === 'em_atendimento').length === 0 && dragOverColumn !== 'em_atendimento' && (
+                    <div className="p-6 text-center text-xs text-slate-400 font-medium">
+                      Nenhum chamado em atendimento no momento.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Coluna 3: Aguardando Peça */}
@@ -966,7 +1026,9 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
               e.preventDefault();
               handleDropOnColumn('aguardando');
             }}
-            className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[420px] ${
+            className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+              collapsedColumns['aguardando'] ? 'min-h-[90px]' : 'min-h-[420px]'
+            } ${
               mobileKanbanTab !== 'all' && mobileKanbanTab !== 'aguardando' ? 'hidden sm:block' : 'block'
             } ${
               dragOverColumn === 'aguardando'
@@ -979,53 +1041,80 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
                 3. Aguardando Peça
               </span>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                {filteredTickets.filter(t => t.status === 'aguardando').length}
-              </span>
-            </div>
-
-            {dragOverColumn === 'aguardando' && (
-              <div className="p-3 text-center rounded-xl bg-white border border-purple-600 text-xs font-bold text-purple-900 animate-pulse">
-                Solte aqui para Aguardando Peça
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                  {filteredTickets.filter(t => t.status === 'aguardando').length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => toggleColumnCollapse('aguardando')}
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                  title={collapsedColumns['aguardando'] ? 'Expandir coluna' : 'Contrair coluna'}
+                >
+                  {collapsedColumns['aguardando'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
               </div>
-            )}
-
-            <div className="space-y-3">
-              {filteredTickets.filter(t => t.status === 'aguardando').map(ticket => (
-                <KanbanTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  departments={departments}
-                  technicians={technicians}
-                  canAssign={canAssignTech}
-                  canDelete={canDelete}
-                  canEditTitle={canEditTitle}
-                  canEditCard={canEditCard}
-                  canMoveStatus={canMoveStatus}
-                  onClick={() => {
-                    setActiveTicket(ticket);
-                    onMarkMessagesAsRead(ticket.id);
-                  }}
-                  onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
-                  onQuickAdvance={() => {
-                    setReqTechnicianId(ticket.technicianId || technicians[0]?.id || '');
-                    setReqNote('Peça recebida, retomando atendimento.');
-                    setDropRequirement({ ticket, targetStatus: 'em_atendimento' });
-                  }}
-                  onQuickResolve={() => handleQuickResolve(ticket)}
-                  onDelete={() => handleDeleteTicket(ticket)}
-                  onEditTitle={() => handleStartEditTitle(ticket)}
-                  onEditCard={() => handleOpenEditCard(ticket)}
-                  onDragStart={(e) => handleDragStart(e, ticket)}
-                />
-              ))}
-
-              {filteredTickets.filter(t => t.status === 'aguardando').length === 0 && dragOverColumn !== 'aguardando' && (
-                <div className="p-6 text-center text-xs text-slate-400 font-medium">
-                  Nenhum chamado aguardando peça.
-                </div>
-              )}
             </div>
+
+            {collapsedColumns['aguardando'] ? (
+              <div 
+                onClick={() => toggleColumnCollapse('aguardando')}
+                className="py-4 text-center cursor-pointer hover:bg-slate-200/50 rounded-xl transition-colors space-y-1"
+                title="Clique para expandir"
+              >
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                  Contraído ({filteredTickets.filter(t => t.status === 'aguardando').length})
+                </span>
+                <span className="text-[10px] text-purple-700 font-semibold block hover:underline">
+                  Expandir ▾
+                </span>
+              </div>
+            ) : (
+              <>
+                {dragOverColumn === 'aguardando' && (
+                  <div className="p-3 text-center rounded-xl bg-white border border-purple-600 text-xs font-bold text-purple-900 animate-pulse">
+                    Solte aqui para Aguardando Peça
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {filteredTickets.filter(t => t.status === 'aguardando').map(ticket => (
+                    <KanbanTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      departments={departments}
+                      technicians={technicians}
+                      canAssign={canAssignTech}
+                      canDelete={canDelete}
+                      canEditTitle={canEditTitle}
+                      canEditCard={canEditCard}
+                      canMoveStatus={canMoveStatus}
+                      onClick={() => {
+                        setActiveTicket(ticket);
+                        onMarkMessagesAsRead(ticket.id);
+                      }}
+                      onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
+                      onQuickAdvance={() => {
+                        setReqTechnicianId(ticket.technicianId || technicians[0]?.id || '');
+                        setReqNote('Peça recebida, retomando atendimento.');
+                        setDropRequirement({ ticket, targetStatus: 'em_atendimento' });
+                      }}
+                      onQuickResolve={() => handleQuickResolve(ticket)}
+                      onDelete={() => handleDeleteTicket(ticket)}
+                      onEditTitle={() => handleStartEditTitle(ticket)}
+                      onEditCard={() => handleOpenEditCard(ticket)}
+                      onDragStart={(e) => handleDragStart(e, ticket)}
+                    />
+                  ))}
+
+                  {filteredTickets.filter(t => t.status === 'aguardando').length === 0 && dragOverColumn !== 'aguardando' && (
+                    <div className="p-6 text-center text-xs text-slate-400 font-medium">
+                      Nenhum chamado aguardando peça.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Coluna 4: Resolvidos */}
@@ -1046,7 +1135,9 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
               e.preventDefault();
               handleDropOnColumn('resolvido');
             }}
-            className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[420px] ${
+            className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+              collapsedColumns['resolvido'] ? 'min-h-[90px]' : 'min-h-[420px]'
+            } ${
               mobileKanbanTab !== 'all' && mobileKanbanTab !== 'resolvido' ? 'hidden sm:block' : 'block'
             } ${
               dragOverColumn === 'resolvido'
@@ -1059,48 +1150,75 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 <span className="w-2.5 h-2.5 rounded-full bg-[#27431e]"></span>
                 4. Resolvidos
               </span>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                {filteredTickets.filter(t => t.status === 'resolvido').length}
-              </span>
-            </div>
-
-            {dragOverColumn === 'resolvido' && (
-              <div className="p-3 text-center rounded-xl bg-white border border-emerald-600 text-xs font-bold text-emerald-900 animate-pulse">
-                Solte aqui para Concluir Chamado
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                  {filteredTickets.filter(t => t.status === 'resolvido').length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => toggleColumnCollapse('resolvido')}
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                  title={collapsedColumns['resolvido'] ? 'Expandir coluna' : 'Contrair coluna'}
+                >
+                  {collapsedColumns['resolvido'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
               </div>
-            )}
-
-            <div className="space-y-3">
-              {filteredTickets.filter(t => t.status === 'resolvido').map(ticket => (
-                <KanbanTicketCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  departments={departments}
-                  technicians={technicians}
-                  canAssign={canAssignTech}
-                  canDelete={canDelete}
-                  canEditTitle={canEditTitle}
-                  canEditCard={canEditCard}
-                  canMoveStatus={canMoveStatus}
-                  onClick={() => {
-                    setActiveTicket(ticket);
-                    onMarkMessagesAsRead(ticket.id);
-                  }}
-                  onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
-                  onQuickResolve={() => handleQuickResolve(ticket)}
-                  onDelete={() => handleDeleteTicket(ticket)}
-                  onEditTitle={() => handleStartEditTitle(ticket)}
-                  onEditCard={() => handleOpenEditCard(ticket)}
-                  onDragStart={(e) => handleDragStart(e, ticket)}
-                />
-              ))}
-
-              {filteredTickets.filter(t => t.status === 'resolvido').length === 0 && dragOverColumn !== 'resolvido' && (
-                <div className="p-6 text-center text-xs text-slate-400 font-medium">
-                  Nenhum chamado concluído.
-                </div>
-              )}
             </div>
+
+            {collapsedColumns['resolvido'] ? (
+              <div 
+                onClick={() => toggleColumnCollapse('resolvido')}
+                className="py-4 text-center cursor-pointer hover:bg-slate-200/50 rounded-xl transition-colors space-y-1"
+                title="Clique para expandir"
+              >
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                  Contraído ({filteredTickets.filter(t => t.status === 'resolvido').length})
+                </span>
+                <span className="text-[10px] text-emerald-700 font-semibold block hover:underline">
+                  Expandir ▾
+                </span>
+              </div>
+            ) : (
+              <>
+                {dragOverColumn === 'resolvido' && (
+                  <div className="p-3 text-center rounded-xl bg-white border border-emerald-600 text-xs font-bold text-emerald-900 animate-pulse">
+                    Solte aqui para Concluir Chamado
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {filteredTickets.filter(t => t.status === 'resolvido').map(ticket => (
+                    <KanbanTicketCard
+                      key={ticket.id}
+                      ticket={ticket}
+                      departments={departments}
+                      technicians={technicians}
+                      canAssign={canAssignTech}
+                      canDelete={canDelete}
+                      canEditTitle={canEditTitle}
+                      canEditCard={canEditCard}
+                      canMoveStatus={canMoveStatus}
+                      onClick={() => {
+                        setActiveTicket(ticket);
+                        onMarkMessagesAsRead(ticket.id);
+                      }}
+                      onQuickAssign={(techId) => onAssignTechnician(ticket.id, techId)}
+                      onQuickResolve={() => handleQuickResolve(ticket)}
+                      onDelete={() => handleDeleteTicket(ticket)}
+                      onEditTitle={() => handleStartEditTitle(ticket)}
+                      onEditCard={() => handleOpenEditCard(ticket)}
+                      onDragStart={(e) => handleDragStart(e, ticket)}
+                    />
+                  ))}
+
+                  {filteredTickets.filter(t => t.status === 'resolvido').length === 0 && dragOverColumn !== 'resolvido' && (
+                    <div className="p-6 text-center text-xs text-slate-400 font-medium">
+                      Nenhum chamado concluído.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           </div>
@@ -1741,16 +1859,30 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                       key={msg.id}
                       className={`flex flex-col ${msg.sender === 'ti' ? 'items-end' : 'items-start'}`}
                     >
-                      <div className={`max-w-[85%] p-3 rounded-xl text-xs ${
+                      <div className={`max-w-[92%] sm:max-w-[85%] p-3 rounded-xl text-xs ${
                         msg.sender === 'ti'
                           ? 'bg-[#1e3316] text-[#dfb642] rounded-br-xs shadow-xs'
                           : 'bg-white border-2 border-amber-300 text-slate-900 rounded-bl-xs shadow-xs'
                       }`}>
-                        <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-80 font-mono">
-                          <span className="font-bold">
-                            {msg.sender === 'ti' ? `TI: ${msg.senderName}` : `Solicitante: ${msg.senderName}`}
+                        <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-90 font-mono">
+                          <span className="font-bold flex items-center gap-1.5 flex-wrap">
+                            {msg.sender === 'ti' ? (
+                              <>
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-[#dfb642] text-[#1e3316] font-black text-[9px] uppercase">
+                                  TI
+                                </span>
+                                <span className="text-[#dfb642]">{msg.senderName || 'Seção de TI'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-amber-500 text-white font-black text-[9px] uppercase">
+                                  SOLICITANTE
+                                </span>
+                                <span className="text-slate-800">{msg.senderName || activeTicket.requesterName}</span>
+                              </>
+                            )}
                           </span>
-                          <span>
+                          <span className="shrink-0 text-slate-400">
                             {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
@@ -1766,10 +1898,10 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
               {/* Respostas Rápidas da TI */}
               {canReplyChat && (
                 <div>
-                  <span className="text-[11px] font-bold text-slate-600 mb-1 block">
+                  <span className="text-[11px] font-bold text-slate-600 mb-1.5 block">
                     Respostas Rápidas do Técnico (Clique para enviar imediatamente):
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5 w-full">
                     {[
                       'Recebido! Militar da TI em deslocamento até a sua Seção.',
                       'Estamos na bancada efetuando o reparo. Previsão de 30 minutos.',
@@ -1781,9 +1913,9 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                         type="button"
                         onClick={() => {
                           const tech = technicians.find(t => t.id === activeTicket.technicianId);
-                          const senderName = tech ? `${tech.name} (TI)` : 'Seção de Informática';
+                          const roleTag = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' ? 'CHINFO' : currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO' ? 'Xerife TI' : currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' ? 'Auxiliar TI' : 'TI';
+                          const senderName = currentUser ? `${currentUser.name} (${roleTag})` : (tech ? `${tech.name} (TI)` : 'Seção de TI');
                           onSendMessage(activeTicket.id, preset, 'ti', senderName);
-                          // Atualiza localmente o activeTicket
                           setActiveTicket(prev => prev ? {
                             ...prev,
                             messages: [
@@ -1799,7 +1931,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                             ]
                           } : null);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#27431e] hover:text-[#dfb642] text-slate-800 text-[11px] font-semibold transition-colors text-left border border-slate-200"
+                        className="w-full sm:w-auto px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-[#27431e] hover:text-[#dfb642] text-slate-800 text-[11px] font-semibold transition-colors text-left border border-slate-200"
                       >
                         + {preset}
                       </button>
@@ -1815,7 +1947,8 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     e.preventDefault();
                     if (!tiChatInput.trim()) return;
                     const tech = technicians.find(t => t.id === activeTicket.technicianId);
-                    const senderName = tech ? `${tech.name} (TI)` : 'Seção de Informática';
+                    const roleTag = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' ? 'CHINFO' : currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO' ? 'Xerife TI' : currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' ? 'Auxiliar TI' : 'TI';
+                    const senderName = currentUser ? `${currentUser.name} (${roleTag})` : (tech ? `${tech.name} (TI)` : 'Seção de TI');
                     onSendMessage(activeTicket.id, tiChatInput.trim(), 'ti', senderName);
                     setActiveTicket(prev => prev ? {
                       ...prev,
@@ -1833,18 +1966,18 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     } : null);
                     setTiChatInput('');
                   }}
-                  className="flex gap-2 pt-1"
+                  className="flex flex-col sm:flex-row gap-2 pt-1 w-full"
                 >
                   <input
                     type="text"
                     placeholder="Escreva uma resposta para o militar solicitante..."
                     value={tiChatInput}
                     onChange={(e) => setTiChatInput(e.target.value)}
-                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white text-slate-900"
+                    className="w-full sm:flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white text-slate-900"
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center gap-1.5 hover:bg-[#27431e] transition-colors border border-[#cba135]"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center justify-center gap-1.5 hover:bg-[#27431e] transition-colors border border-[#cba135] shrink-0"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Responder</span>
@@ -1919,7 +2052,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
 
               {/* Inserir novo despacho */}
               {canAddNotes && (
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full">
                   <input
                     type="text"
                     placeholder="Adicionar nota técnica ou andamento militar..."
@@ -1928,12 +2061,12 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleSaveNote();
                     }}
-                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
+                    className="w-full sm:flex-1 px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
                   />
                   <button
                     type="button"
                     onClick={handleSaveNote}
-                    className="px-3.5 py-2 rounded-lg bg-[#27431e] text-[#dfb642] font-black text-xs flex items-center gap-1 hover:bg-[#1e3316]"
+                    className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#27431e] text-[#dfb642] font-black text-xs flex items-center justify-center gap-1 hover:bg-[#1e3316] shrink-0"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Despachar</span>
@@ -2470,7 +2603,11 @@ const KanbanTicketCard: React.FC<KanbanTicketCardProps> = ({
       className={`group p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all relative select-none ${
         canMoveStatus ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
       } ${
-        isCritical ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'
+        isResolved 
+          ? 'border-slate-200/80 bg-slate-50/80 opacity-65' 
+          : isCritical 
+            ? 'border-red-500 ring-1 ring-red-500' 
+            : 'border-slate-200'
       }`}
     >
       {/* Topo do Card com Grip de Arrasto e Ações Rápidas */}
@@ -2486,10 +2623,12 @@ const KanbanTicketCard: React.FC<KanbanTicketCardProps> = ({
 
         <div className="flex items-center gap-1.5 shrink-0 ml-auto">
           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase font-mono whitespace-nowrap shrink-0 ${
-            ticket.priority === 'critica' ? 'bg-red-600 text-white' :
-            ticket.priority === 'alta' ? 'bg-orange-500 text-white' :
-            ticket.priority === 'media' ? 'bg-[#27431e] text-[#dfb642]' :
-            'bg-slate-500 text-white'
+            isResolved 
+              ? 'bg-slate-200 text-slate-600'
+              : ticket.priority === 'critica' ? 'bg-red-600 text-white' :
+              ticket.priority === 'alta' ? 'bg-orange-500 text-white' :
+              ticket.priority === 'media' ? 'bg-[#27431e] text-[#dfb642]' :
+              'bg-slate-500 text-white'
           }`}>
             {ticket.priority}
           </span>

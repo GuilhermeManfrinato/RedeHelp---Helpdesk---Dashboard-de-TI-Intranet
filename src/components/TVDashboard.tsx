@@ -106,14 +106,14 @@ export const TVDashboard: React.FC<TVDashboardProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded text-xs font-mono font-black uppercase tracking-widest bg-[#dfb642] text-[#192b14]">
-                2º GAC - REGIMENTO DEODORO
+                2º GAC
               </span>
               <span className="text-xs text-emerald-300 font-mono tracking-wider">
                 ITU - SP · ARTILHARIA
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
-              SEÇÃO DE INFORMÁTICA · PAINEL DE SALA
+              SEÇÃO DE INFORMÁTICA & TI · PAINEL DE SALA
             </h1>
           </div>
         </div>
@@ -385,14 +385,21 @@ export const TVDashboard: React.FC<TVDashboardProps> = ({
       {/* Rodapé Oficial do Painel de TV */}
       <footer className="bg-[#152311] border-t border-[#cba135]/40 py-2 px-6 flex items-center justify-between text-xs text-emerald-200/70 shrink-0 relative z-10">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-[#dfb642]">2º GAC - REGIMENTO DEODORO</span>
+          <span className="font-bold text-[#dfb642]">2º GAC</span>
           <span>·</span>
-          <span>Seção de Informática & Telemática</span>
+          <span>Seção de Informática & TI</span>
           <span>·</span>
           <span className="font-mono text-emerald-300">BRAÇO FORTE, MÃO AMIGA</span>
         </div>
         <div className="font-mono text-[11px] text-[#dfb642]/90">
-          desenvolvido com &lt;3 por Manfrinato | INFO/26
+          <a
+            href="https://linkedin.com/in/manfrinato"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline hover:text-white transition-colors"
+          >
+            desenvolvido com &lt;3 por Manfrinato | INFO/26
+          </a>
         </div>
       </footer>
 

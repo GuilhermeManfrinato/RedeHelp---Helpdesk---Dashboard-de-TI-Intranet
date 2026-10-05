@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className={`text-sm sm:text-lg font-black tracking-tight block leading-tight truncate ${
                   a11y.highContrast ? 'text-yellow-400' : 'text-[#dfb642]'
                 }`}>
-                  2º GAC - REGIMENTO DEODORO
+                  2º GAC
                 </span>
               </div>
               <span className="text-[10px] sm:text-[11px] text-emerald-200/80 font-mono tracking-tight block truncate">
@@ -177,15 +177,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Militares da TI</span>
               </button>
             )}
-
-            <button
-              onClick={handleTvClick}
-              className="px-3.5 py-2 rounded-xl text-xs font-black transition-colors flex items-center gap-2 whitespace-nowrap bg-[#27431e] text-[#dfb642] hover:bg-[#325727] border border-[#cba135]/50 shadow-xs cursor-pointer"
-              title="Abrir Painel de TV em tela cheia para a sala de TI"
-            >
-              <Tv className="w-4 h-4 text-[#dfb642]" />
-              <span>Painel TV (Sala)</span>
-            </button>
           </nav>
         ) : (
           <div className="hidden md:flex items-center gap-2 text-xs font-semibold text-emerald-100/90 font-mono">

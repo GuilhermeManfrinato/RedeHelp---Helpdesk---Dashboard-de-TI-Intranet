@@ -38,6 +38,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localAttempts, setLocalAttempts] = useState<Record<string, number>>({});
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +110,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           warName: 'Das Deves',
           role: 'CH-SECINFO',
           active: true,
-          specialty: 'Chefe da Seção de Informática & Telemática (CHSECINFO)',
+          specialty: 'Chefe da Seção de Informática & TI (CHSECINFO)',
           createdAt: new Date().toISOString(),
         };
       } else if ((cleanUser === 'cavalcanti' || cleanNoSpace === 'cavalcanti' || cleanUser === 'chsecinfo') && cleanPass === 'C4v4lc4nti2620@') {
@@ -122,7 +123,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           warName: 'Cavalcanti',
           role: 'CH-SECINFO',
           active: true,
-          specialty: 'Chefe da Seção de Informática & Telemática (CHSECINFO)',
+          specialty: 'Chefe da Seção de Informática & TI (CHSECINFO)',
           createdAt: new Date().toISOString(),
         };
       } else if ((cleanUser === 'castro' || cleanNoSpace === 'castro' || cleanUser === 'auxsecinfo') && cleanPass === 'Fl59381286789.') {
@@ -220,7 +221,9 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     }
 
     // 2. Verificar se o login está bloqueado por excesso de tentativas (3 erros)
-    const isLocked = Boolean(matchedUser.isLocked || (matchedUser.failedAttempts && matchedUser.failedAttempts >= 3));
+    const userKey = matchedUser.id || matchedUser.username;
+    const baseAttempts = Math.max(matchedUser.failedAttempts || 0, localAttempts[userKey] || 0);
+    const isLocked = Boolean(matchedUser.isLocked || baseAttempts >= 3);
     if (isLocked) {
       setIsSubmitting(false);
       setErrorMsg('Este login está BLOQUEADO por motivos de segurança (3 tentativas incorretas). Para liberar o acesso, solicite a autorização do Chefe da Seção (CHINFO) ou Auxiliar.');
@@ -230,7 +233,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     // 3. Validação estrita da Senha
     if (matchedUser.password === cleanPass) {
       // Senha correta: resetar contador de tentativas erradas se houver
-      if (matchedUser.failedAttempts && matchedUser.failedAttempts > 0) {
+      setLocalAttempts(prev => ({ ...prev, [userKey]: 0 }));
+      if (baseAttempts > 0) {
         const resetUser: MilitaryUser = {
           ...matchedUser,
           failedAttempts: 0,
@@ -249,8 +253,9 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       return;
     }
 
-    // 4. Senha incorreta: contabilizar erro e bloquear ao atingir 3 tentativas
-    const currentAttempts = (matchedUser.failedAttempts || 0) + 1;
+    // 4. Senha incorreta: contabilizar erro progressivamente e bloquear ao atingir 3 tentativas
+    const currentAttempts = baseAttempts + 1;
+    setLocalAttempts(prev => ({ ...prev, [userKey]: currentAttempts }));
     const lockNow = currentAttempts >= 3;
 
     const updatedUser: MilitaryUser = {
@@ -299,7 +304,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     }`}>
       {/* Marca d'água militar: General Mallet & Artilharia */}
       <div 
-        className="absolute inset-0 pointer-events-none opacity-[0.06] bg-cover bg-center bg-no-repeat mix-blend-multiply"
+        className="absolute inset-0 pointer-events-none opacity-[0.025] bg-cover bg-center bg-no-repeat mix-blend-multiply"
         style={{ backgroundImage: `url(${malletBg})` }}
         aria-hidden="true"
       />
@@ -317,10 +322,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           </div>
 
           <div className="font-mono text-xs font-black tracking-widest text-[#2d4a22] uppercase">
-            2º GAC - REGIMENTO DEODORO
+            2º GAC
           </div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            Seção de Informática & Telemática
+            Seção de Informática & TI
           </h2>
           <p className="text-xs text-slate-600">
             Acesso Restrito · Autenticação Individual Militar
@@ -411,7 +416,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 leading-relaxed text-left flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-[#27431e] shrink-0 mt-0.5" />
             <span>
-              O sistema monitora tentativas inválidas. Em caso de 3 erros consecutivos, o login é trancado preventivamente e só pode ser liberado pelo <strong>Chefe da Sec Info (CHINFO)</strong> ou <strong>Auxiliar</strong>.
+              O sistema monitora tentativas inválidas. Em caso de 3 erros consecutivos, o login é trancado preventivamente e só pode ser liberado pelo <strong>Chefe da Seção (CH-SECINFO)</strong> mediante confirmação de senha.
             </span>
           </div>
         </div>
@@ -428,9 +433,16 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           </button>
         </div>
 
-        {/* Crédito do Desenvolvedor */}
+        {/* Crédito do Desenvolvedor com Link */}
         <div className="mt-4 pt-3 text-center text-[11px] font-mono text-[#27431e] font-semibold border-t border-slate-100">
-          Desenvolvido com &lt;3 por Manfrinato
+          <a
+            href="https://linkedin.com/in/manfrinato"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline hover:text-[#192b14]"
+          >
+            Desenvolvido com &lt;3 por Manfrinato
+          </a>
         </div>
 
       </div>

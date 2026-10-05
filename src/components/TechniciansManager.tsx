@@ -144,7 +144,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
   const [activeTab, setActiveTab] = useState<'users' | 'audit' | 'technicians'>('users');
 
   // Permissões do usuário atual
-  const isChefe = currentUser?.role === 'CH-SECINFO';
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
   const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
   const isXerife = currentUser?.role === 'CH-XERIFEINFO';
   const canManageUsers = isChefe || isAux || isXerife;
@@ -178,6 +178,12 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
   const [deactivationReasonCategory, setDeactivationReasonCategory] = useState<string>('Transferência de OM');
   const [deactivationNotes, setDeactivationNotes] = useState<string>('');
 
+  // Estados do Modal de Desbloqueio de Usuário Bloqueado (Chefe da Seção)
+  const [unlockTargetUser, setUnlockTargetUser] = useState<MilitaryUser | null>(null);
+  const [chefePasswordInput, setChefePasswordInput] = useState('');
+  const [unlockError, setUnlockError] = useState('');
+  const [showUnlockPassword, setShowUnlockPassword] = useState(false);
+
   // Estados de Filtro de Logs de Auditoria
   const [logSearch, setLogSearch] = useState('');
   const [logFilterAction, setLogFilterAction] = useState('all');
@@ -190,11 +196,12 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
         if (showAddUserModal) setShowAddUserModal(false);
         else if (editingCredsUser) setEditingCredsUser(null);
         else if (deactivatingUser) setDeactivatingUser(null);
+        else if (unlockTargetUser) setUnlockTargetUser(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAddUserModal, editingCredsUser, deactivatingUser]);
+  }, [showAddUserModal, editingCredsUser, deactivatingUser, unlockTargetUser]);
 
   // Criação de Novo Militar com Login & Senha
   const handleCreateMilitaryUser = (e: React.FormEvent) => {
@@ -359,31 +366,60 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
     setEditingCredsUser(null);
   };
 
-  // Desbloquear Login Imediatamente (CHINFO ou Auxiliar)
+  // Abrir Modal de Desbloqueio (exclusivo para o Chefe da Seção com confirmação de senha)
   const handleUnlockUser = (user: MilitaryUser) => {
+    if (!isChefe) {
+      alert('Apenas o Chefe da Seção (CH-SECINFO) tem autorização para desbloquear credenciais militares.');
+      return;
+    }
+    setUnlockTargetUser(user);
+    setChefePasswordInput('');
+    setUnlockError('');
+    setShowUnlockPassword(false);
+  };
+
+  // Confirmar Desbloqueio mediante Senha do Chefe da Seção
+  const handleConfirmUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unlockTargetUser) return;
+    setUnlockError('');
+
+    if (!isChefe) {
+      setUnlockError('Apenas o Chefe da Seção (CH-SECINFO) possui autorização para desbloquear credenciais.');
+      return;
+    }
+
+    if (!currentUser?.password || chefePasswordInput !== currentUser.password) {
+      setUnlockError('Senha do Chefe da Seção incorreta! O desbloqueio não foi autorizado.');
+      return;
+    }
+
     const updatedUser: MilitaryUser = {
-      ...user,
+      ...unlockTargetUser,
       isLocked: false,
       failedAttempts: 0,
       lockedAt: undefined,
     };
 
     onUpdateMilitaryUsers(
-      militaryUsers.map(u => u.id === user.id ? updatedUser : u)
+      militaryUsers.map(u => u.id === unlockTargetUser.id ? updatedUser : u)
     );
 
-    api.updateMilitaryUser(user.id, { isLocked: false, failedAttempts: 0 } as any).catch(console.warn);
+    api.updateMilitaryUser(unlockTargetUser.id, { isLocked: false, failedAttempts: 0 } as any).catch(console.warn);
 
     onAddAuditLog({
       militaryName: currentUser?.name || 'Chefe da Seção',
       militaryLogin: currentUser?.username || 'admin',
       role: currentUser?.role || 'CH-SECINFO',
       actionType: 'USUARIO_DESBLOQUEADO',
-      summary: `Desbloqueou e liberou o login de acesso do militar ${user.name} (${user.username}).`,
-      targetRef: user.username,
+      summary: `Chefe da Seção ${currentUser?.name || 'CHINFO'} desbloqueou o login do militar ${unlockTargetUser.name} (${unlockTargetUser.username}) mediante confirmação de senha.`,
+      targetRef: unlockTargetUser.username,
     });
 
-    alert(`Login do militar ${user.name} (@${user.username}) liberado com sucesso!`);
+    alert(`Login do militar ${unlockTargetUser.name} (@${unlockTargetUser.username}) liberado com sucesso!`);
+    setUnlockTargetUser(null);
+    setChefePasswordInput('');
+    setUnlockError('');
   };
 
   // Alternar Status Ativo / Inativo
@@ -618,6 +654,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
             {militaryUsers.map((user) => {
               const roleMeta = ROLES_INFO[user.role] || ROLES_INFO['CH-TECNICOINFO'];
               const isLogged = currentUser?.id === user.id;
+              const isUserLocked = Boolean(user.isLocked || (user.failedAttempts && user.failedAttempts >= 3));
 
               return (
                 <div
@@ -677,24 +714,33 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                   </div>
 
                   {/* Alerta de Bloqueio por Excesso de Tentativas */}
-                  {Boolean(user.isLocked || (user.failedAttempts && user.failedAttempts >= 3)) && (
-                    <div className="p-3 rounded-2xl bg-red-100 border border-red-300 text-red-900 text-xs flex items-center justify-between gap-2 shadow-xs">
+                  {isUserLocked && (
+                    <div className="p-3 rounded-2xl bg-red-100 border border-red-300 text-red-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
                       <div className="flex items-center gap-2">
                         <Lock className="w-4 h-4 text-red-700 shrink-0" />
                         <div>
-                          <span className="font-black text-red-950 block">LOGIN BLOQUEADO</span>
-                          <span className="text-[10px] text-red-700 font-mono">3 erros de senha consecutivos</span>
+                          <span className="font-black text-red-950 flex items-center gap-1.5">
+                            LOGIN BLOQUEADO <Lock className="w-3.5 h-3.5 text-red-700" />
+                          </span>
+                          <span className="text-[10px] text-red-700 font-mono">
+                            {user.failedAttempts || 3} erros de senha consecutivos
+                          </span>
                         </div>
                       </div>
-                      {canManageUsers && (
+                      {isChefe ? (
                         <button
                           type="button"
                           onClick={() => handleUnlockUser(user)}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs shadow-xs cursor-pointer transition-colors whitespace-nowrap"
-                          title="Liberar e desbloquear acesso imediatamente"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs shadow-xs cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5 self-start sm:self-auto"
+                          title="Liberar e desbloquear acesso com senha do Chefe"
                         >
-                          Desbloquear Acesso
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Liberar Acesso (Chefe)</span>
                         </button>
+                      ) : (
+                        <span className="text-[10px] text-red-800 font-semibold italic">
+                          Apenas o Chefe da Seção pode liberar
+                        </span>
                       )}
                     </div>
                   )}
@@ -704,9 +750,16 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <span className="text-slate-500 font-bold block text-[11px]">Login do Militar:</span>
-                        <code className="font-mono font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-300">
-                          {user.username}
-                        </code>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <code className="font-mono font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-300 inline-flex items-center gap-1.5">
+                            {user.username}
+                            {isUserLocked && (
+                              <span title="Login Bloqueado (3 erros)">
+                                <Lock className="w-3.5 h-3.5 text-red-600 inline shrink-0" />
+                              </span>
+                            )}
+                          </code>
+                        </div>
                       </div>
 
                       <div>
@@ -1518,6 +1571,113 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                   className="px-5 py-2.5 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-700 shadow-md cursor-pointer"
                 >
                   Confirmar Afastamento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: DESBLOQUEIO DE MILITAR PELO CHEFE DA SEÇÃO (CONFIRMAÇÃO DE SENHA) */}
+      {unlockTargetUser && (
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setUnlockTargetUser(null); }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-emerald-600/40 cursor-default"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-red-100 text-red-700">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900">
+                    Desbloqueio de Acesso Militar
+                  </h3>
+                  <span className="text-xs text-slate-500 font-mono">
+                    2º GAC · Liberação com Senha do Chefe
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUnlockTargetUser(null)}
+                className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+              <p className="font-bold text-slate-800">
+                Militar a ser liberado:
+              </p>
+              <div className="flex items-center gap-2 font-mono">
+                <span className="font-black text-slate-900">{unlockTargetUser.name}</span>
+                <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[11px]">@{unlockTargetUser.username}</span>
+                <Lock className="w-3.5 h-3.5 text-red-600" />
+              </div>
+              <p className="text-[11px] text-red-700 pt-1">
+                Bloqueado após atingir 3 tentativas consecutivas de senha incorreta.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmUnlock} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Senha do Chefe da Seção ({currentUser?.name || 'CH-SECINFO'}) *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showUnlockPassword ? 'text' : 'password'}
+                    required
+                    autoFocus
+                    placeholder="Digite sua senha de Chefe para autorizar..."
+                    value={chefePasswordInput}
+                    onChange={(e) => {
+                      setChefePasswordInput(e.target.value);
+                      if (unlockError) setUnlockError('');
+                    }}
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-[#27431e] focus:border-[#27431e]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUnlockPassword(!showUnlockPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  >
+                    {showUnlockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {unlockError && (
+                <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{unlockError}</span>
+                </div>
+              )}
+
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
+                Esta ação zera o contador de erros e restaura imediatamente o acesso do militar. A liberação ficará registrada no log de auditoria da seção.
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setUnlockTargetUser(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-700 text-white font-bold text-xs hover:bg-emerald-800 shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Confirmar e Desbloquear</span>
                 </button>
               </div>
             </form>

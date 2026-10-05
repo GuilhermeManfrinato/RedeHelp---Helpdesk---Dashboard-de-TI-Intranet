@@ -19,14 +19,13 @@ import {
 } from 'lucide-react';
 import { AccessibilitySettings, MilitaryUser, AdminTab, Ticket, Department } from '../types';
 import { RegimentoDeodoroLogo } from './RegimentoDeodoroLogo';
-import { TvAccessModal } from './TvAccessModal';
 import { DoubtsModal } from './DoubtsModal';
 
 interface AdminTopBarProps {
   adminTab: AdminTab;
   onToggleMobileSidebar: () => void;
   unreadMessagesCount: number;
-  onOpenTvMode: () => void;
+  onOpenTvMode?: () => void;
   onLogoutAdmin: () => void;
   criticalCount: number;
   onFilterCritical?: () => void;
@@ -44,7 +43,6 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
   adminTab,
   onToggleMobileSidebar,
   unreadMessagesCount,
-  onOpenTvMode,
   onLogoutAdmin,
   criticalCount,
   onFilterCritical,
@@ -58,18 +56,34 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
   onUpdateA11y,
 }) => {
   const [timeStr, setTimeStr] = useState<string>('');
-  const [showTvModal, setShowTvModal] = useState<boolean>(false);
+  const [nowDate, setNowDate] = useState<Date>(new Date());
   const [showDoubtsModal, setShowDoubtsModal] = useState<boolean>(false);
+  const [showExpedienteAlert, setShowExpedienteAlert] = useState<boolean>(false);
 
   useEffect(() => {
     const update = () => {
       const now = new Date();
+      setNowDate(now);
       setTimeStr(now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+
+      // Verificar alerta das 15:30 (aviso de fim de expediente em 15 minutos)
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      if (hour === 15 && minute >= 30 && minute <= 45) {
+        const key = `eb_exp_alert_${now.toDateString()}`;
+        if (sessionStorage.getItem(key) !== 'true') {
+          setShowExpedienteAlert(true);
+        }
+      }
     };
     update();
     const interval = setInterval(update, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const currentHour = nowDate.getHours();
+  const isOffHours = currentHour < 8; // Fora de expediente (antes das 08h)
+  const isLunch = currentHour >= 12 && currentHour < 13; // Almoço (12h às 13h)
 
   const getTabTitle = () => {
     switch (adminTab) {
@@ -123,16 +137,6 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
     }
   };
 
-  // Handler para clique no botão TV (Liberado para tvinfo e DEV)
-  const isTvAllowed = currentUser?.role === 'CH-TVINFO' || currentUser?.username === 'dev';
-
-  const handleTvClick = () => {
-    if (isTvAllowed) {
-      onOpenTvMode();
-    } else {
-      setShowTvModal(true);
-    }
-  };
 
   const cycleFontSize = (direction: 'increase' | 'decrease') => {
     if (!onUpdateA11y) return;
@@ -169,7 +173,7 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] sm:text-[10px] font-mono font-black uppercase tracking-wider text-[#27431e] bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded border border-emerald-200 truncate">
-                2º GAC · REGIMENTO DEODORO
+                2º GAC
               </span>
             </div>
             <h1 className="text-sm sm:text-xl font-black text-slate-900 leading-tight truncate">
@@ -247,21 +251,42 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
           </div>
         )}
 
-        {/* Relógio Digital */}
-        <div className="hidden lg:flex items-center gap-1.5 text-xs font-mono font-bold text-slate-600 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200">
-          <Clock className="w-3.5 h-3.5 text-[#27431e]" />
-          <span>{timeStr}</span>
-        </div>
-
-        {/* Botão Painel TV (com alerta para quem não for CH-TVINFO) */}
-        <button
-          onClick={handleTvClick}
-          className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center gap-1.5 sm:gap-2 hover:bg-[#27431e] transition-colors border border-[#cba135]/50 shadow-xs cursor-pointer"
-          title="Abrir painel ampliado para televisão da sala (exclusivo para perfil tvinfo)"
+        {/* Relógio Digital & Indicador de Expediente Militar */}
+        <div 
+          className={`hidden lg:flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1.5 rounded-xl border transition-all ${
+            isOffHours 
+              ? 'bg-indigo-950 text-indigo-200 border-indigo-700' 
+              : isLunch 
+                ? 'bg-amber-100 text-amber-950 border-amber-300' 
+                : 'bg-slate-100 text-slate-700 border-slate-200'
+          }`}
+          title={
+            isOffHours 
+              ? 'Fora de Expediente Militar (Antes das 08:00) - Modo Ausente' 
+              : isLunch 
+                ? 'Horário de Almoço (12:00 às 13:00) - Intervalo da Seção' 
+                : 'Expediente Militar Ativo'
+          }
         >
-          <Tv className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span className="hidden sm:inline">Painel TV</span>
-        </button>
+          {isOffHours ? (
+            <span className="text-sm" role="img" aria-label="dormindo">💤</span>
+          ) : isLunch ? (
+            <span className="text-sm" role="img" aria-label="almoco">🍽️</span>
+          ) : (
+            <Clock className="w-3.5 h-3.5 text-[#27431e]" />
+          )}
+          <span>{timeStr}</span>
+          {isOffHours && (
+            <span className="text-[10px] bg-indigo-900 text-indigo-200 px-1.5 py-0.2 rounded font-sans font-bold">
+              Ausente
+            </span>
+          )}
+          {isLunch && (
+            <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-sans font-bold">
+              Almoço
+            </span>
+          )}
+        </div>
 
         {/* Sair */}
         <button
@@ -273,17 +298,37 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
         </button>
       </div>
 
-      {/* Modal de Alerta de Acesso ao Modo TV */}
-      <TvAccessModal
-        isOpen={showTvModal}
-        onClose={() => setShowTvModal(false)}
-        onSwitchLogin={() => {
-          setShowTvModal(false);
-          onLogoutAdmin();
-        }}
-        currentLogin={currentUser?.username}
-        currentRole={currentUser?.role}
-      />
+      {/* Alerta de 15 minutos para encerramento de expediente (15:30) */}
+      {showExpedienteAlert && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border-2 border-amber-500 space-y-4 text-center">
+            <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center mx-auto text-3xl">
+              ⏰
+            </div>
+            <div>
+              <span className="text-[10px] font-mono font-black uppercase text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
+                15:30 · Aviso de Encerramento
+              </span>
+              <h3 className="text-xl font-black text-slate-900 mt-2">
+                Expediente encerra em 15 minutos!
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                <strong>Atenção Técnicos de TI e Xerife:</strong> Favor organizar e arrumar a Seção de Informática e lembrar da <strong>tiragem de falta final do expediente</strong>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                sessionStorage.setItem(`eb_exp_alert_${new Date().toDateString()}`, 'true');
+                setShowExpedienteAlert(false);
+              }}
+              className="w-full py-3 rounded-2xl bg-[#1e3316] hover:bg-[#27431e] text-[#dfb642] font-black text-xs uppercase tracking-wider border border-[#cba135] shadow-md cursor-pointer transition-colors"
+            >
+              Ciente / Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Exibição de Chamados com Dúvidas/Notificações */}
       <DoubtsModal

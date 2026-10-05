@@ -123,25 +123,25 @@ export async function generateTicketPdf(ticket: Ticket, departmentName?: string)
 
   // 3. Faixa de Cabeçalho Superior Institucional
   doc.setFillColor(25, 43, 20); // Verde Oliva Escuro EB
-  doc.rect(margin + 2, margin + 2, contentWidth - 4, 30, 'F');
+  doc.rect(margin + 2, margin + 2, contentWidth - 4, 27, 'F');
 
   doc.setTextColor(223, 182, 66); // Dourado EB
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.text('REPÚBLICA FEDERATIVA DO BRASIL - MINISTÉRIO DA DEFESA', pageWidth / 2, margin + 8, { align: 'center' });
-  doc.text('EXÉRCITO BRASILEIRO - COMANDO MILITAR DO SUDESTE - 2ª DE', pageWidth / 2, margin + 13, { align: 'center' });
+  doc.text('REPÚBLICA FEDERATIVA DO BRASIL - MINISTÉRIO DA DEFESA', pageWidth / 2, margin + 7.5, { align: 'center' });
+  doc.text('EXÉRCITO BRASILEIRO - COMANDO MILITAR DO SUDESTE - 2ª DE', pageWidth / 2, margin + 12, { align: 'center' });
 
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
   doc.setTextColor(255, 255, 255);
-  doc.text('2º GRUPO DE ARTILHARIA DE CAMPANHA - REGIMENTO DEODORO', pageWidth / 2, margin + 19, { align: 'center' });
+  doc.text('2º GRUPO DE ARTILHARIA DE CAMPANHA - REGIMENTO DEODORO', pageWidth / 2, margin + 17.5, { align: 'center' });
 
   doc.setFontSize(8);
   doc.setTextColor(203, 161, 53);
-  doc.text('SEÇÃO DE INFORMÁTICA & TELEMÁTICA - ITU - SP', pageWidth / 2, margin + 24, { align: 'center' });
+  doc.text('SEÇÃO DE INFORMÁTICA & TI - ITU - SP', pageWidth / 2, margin + 22.5, { align: 'center' });
   doc.setFont('helvetica', 'italic');
-  doc.text('"Eles que venham, por aqui não passam!"', pageWidth / 2, margin + 28.5, { align: 'center' });
+  doc.text('"Eles que venham, por aqui não passam!"', pageWidth / 2, margin + 26.5, { align: 'center' });
 
-  let curY = margin + 35;
+  let curY = margin + 36;
 
   // 4. Título do Documento
   doc.setTextColor(25, 43, 20);
@@ -149,7 +149,7 @@ export async function generateTicketPdf(ticket: Ticket, departmentName?: string)
   doc.setFontSize(12.5);
   doc.text('COMPROVANTE OFICIAL DE ABERTURA DE CHAMADO', pageWidth / 2, curY, { align: 'center' });
 
-  curY += 4.5;
+  curY += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
@@ -256,7 +256,7 @@ export async function generateTicketPdf(ticket: Ticket, departmentName?: string)
     `- Acompanhe o andamento no Portal de Chamados da Intranet informando o código: ${ticket.code}.`,
     '- Pelo portal, é possível enviar mensagens diretas ao militar técnico responsável e esclarecer dúvidas.',
     '- A Seção de TI realizará o atendimento conforme a prioridade militar e a fila de serviço do Regimento.',
-    '- Em caso de urgência inopinada, contate imediatamente o ramal da Seção de Informática & Telemática.'
+    '- Em caso de urgência inopinada, contate imediatamente o ramal da Seção de Informática & TI.'
   ];
 
   let instY = curY + 10.5;
@@ -404,7 +404,7 @@ export async function generateTicketPdf(ticket: Ticket, departmentName?: string)
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(51, 65, 85);
-  doc.text('Chefe da Seção de Informática & Telemática', colRightX + colRightW / 2, curY + 47.5, { align: 'center' });
+  doc.text('Chefe da Seção de Informática & TI', colRightX + colRightW / 2, curY + 47.5, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
@@ -419,12 +419,11 @@ export async function generateTicketPdf(ticket: Ticket, departmentName?: string)
   doc.setTextColor(30, 67, 24);
   doc.text('DOCUMENTO ASSINADO DIGITALMENTE - PADRÃO EB', colRightX + colRightW / 2, curY + 59, { align: 'center' });
 
-  // 10. Rodapé de Crédito e Lealdade Militar
+  // 10. Rodapé Institucional Militar
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(148, 163, 184);
-  doc.text('2º Grupo de Artilharia de Campanha - Regimento Deodoro | Praça Duque de Caxias, s/n - Centro, Itu - SP', pageWidth / 2, pageHeight - margin - 3.5, { align: 'center' });
-  doc.text('Desenvolvido com carinho por Manfrinato', pageWidth / 2, pageHeight - margin - 0.5, { align: 'center' });
+  doc.text('2º Grupo de Artilharia de Campanha - Regimento Deodoro | Praça Duque de Caxias, s/n - Centro, Itu - SP', pageWidth / 2, pageHeight - margin - 2, { align: 'center' });
 
   // Disparar Download
   const filename = `Comprovante_Chamado_${ticket.code}.pdf`;

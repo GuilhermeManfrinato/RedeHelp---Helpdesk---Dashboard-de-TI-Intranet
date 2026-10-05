@@ -22,9 +22,18 @@ import {
   Building2,
   Users,
   ClipboardCheck,
-  Copy
+  Copy,
+  Star,
+  Network,
+  Code,
+  Wrench,
+  Layers,
+  LayoutGrid,
+  List,
+  ChevronDown,
+  GripVertical
 } from 'lucide-react';
-import { Mission, MissionPriority, MissionStatus, MilitaryUser, Technician, AccessibilitySettings } from '../types';
+import { Mission, MissionPriority, MissionStatus, MissionArea, MilitaryUser, Technician, AccessibilitySettings } from '../types';
 import { AttendanceModal } from './AttendanceModal';
 
 interface MissionsManagerProps {
@@ -37,6 +46,7 @@ interface MissionsManagerProps {
     title: string;
     description: string;
     priority: MissionPriority;
+    area?: MissionArea;
     assignedTechnicianIds: string[];
     deadline?: string;
     checklistItems: string[];
@@ -61,18 +71,143 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
   onToggleChecklistItem,
   onAddAuditLog,
 }) => {
-  // Permissões
-  const isChefe = currentUser?.role === 'CH-SECINFO';
-  const isXerife = currentUser?.role === 'CH-XERIFEINFO';
+  // Permissões Oficiais
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || currentUser?.username === 'dev';
+  const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
+  const isXerife = currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO';
   const canManageMissions = isChefe || isXerife; // Somente Chefe e Xerife criam e editam
   const canDeleteMissions = isChefe; // Apenas o Chefe de Seção exclui, padrão do sistema militar
+  const canTakeAttendance = isChefe || isAux || isXerife; // Xerifes, Auxiliares e Chefes de Seção
+  const canSetPriority = isChefe || isAux || isXerife; // Xerife, Chefe e Aux definem prioridade
   const isTV = currentUser?.role === 'CH-TVINFO';
   const canInteract = !isTV;
 
-  // Estados de Filtro
+  const hasActiveTopPriority = missions.some(m => m.isTopPriority && m.status !== 'concluida');
+
+  const handleToggleTopPriority = (e: React.MouseEvent, mission: Mission) => {
+    e.stopPropagation();
+    if (!canSetPriority) return;
+    const isNowTop = !mission.isTopPriority;
+    const designation = isNowTop 
+      ? `${currentUser?.role || 'Comando'} - ${currentUser?.name || 'Militar'}`
+      : undefined;
+
+    onUpdateMission(mission.id, {
+      isTopPriority: isNowTop,
+      priorityDesignatedBy: designation,
+    });
+
+    onAddAuditLog?.({
+      militaryName: currentUser?.name || 'Comando',
+      militaryLogin: currentUser?.username || 'militar',
+      role: currentUser?.role || 'CH-SECINFO',
+      actionType: 'EDICAO_MISSAO',
+      summary: isNowTop 
+        ? `Definiu a missão ${mission.code} (${mission.title}) como PRIORIDADE MÁXIMA DA SEÇÃO.`
+        : `Removeu a prioridade máxima da missão ${mission.code}.`,
+      targetRef: mission.code,
+    });
+  };
+
+  // Estados de Filtro e Visualização
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [statusFilter, setStatusFilter] = useState<'todos' | MissionStatus>('todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<'todas' | MissionPriority>('todas');
+
+  // Drag and Drop de Missões por Área Técnica
+  const [draggedMissionId, setDraggedMissionId] = useState<string | null>(null);
+  const [dragOverArea, setDragOverArea] = useState<MissionArea | null>(null);
+  const [collapsedMissionsColumns, setCollapsedMissionsColumns] = useState<Record<string, boolean>>({
+    redes: false,
+    desenvolvimento: false,
+    hardware: false,
+    geral: false,
+  });
+
+  const toggleAreaCollapse = (areaKey: string) => {
+    setCollapsedMissionsColumns(prev => ({ ...prev, [areaKey]: !prev[areaKey] }));
+  };
+
+  const getMissionArea = (m: Mission): MissionArea => {
+    if (m.area) return m.area;
+    const text = `${m.title} ${m.description}`.toLowerCase();
+    if (/(rede|switch|roteador|fibra|wifi|wi-fi|ip|vlan|conectividade|internet|dns|dhcp|link)/i.test(text)) return 'redes';
+    if (/(sistema|desenvolvimento|dev|código|software|portal|intranet|banco de dados|api|site|script)/i.test(text)) return 'desenvolvimento';
+    if (/(computador|notebook|bancada|impressora|toner|mouse|teclado|hardware|fonte|placa|disco|ssd|ram|formata)/i.test(text)) return 'hardware';
+    return 'geral';
+  };
+
+  const handleDropOnArea = (targetArea: MissionArea) => {
+    if (!draggedMissionId) return;
+    const targetMission = missions.find(m => m.id === draggedMissionId);
+    if (targetMission && getMissionArea(targetMission) !== targetArea) {
+      onUpdateMission(draggedMissionId, { area: targetArea });
+      onAddAuditLog?.({
+        militaryName: currentUser?.name || 'Militar da TI',
+        militaryLogin: currentUser?.username || 'ti',
+        role: currentUser?.role || 'CH-SECINFO',
+        actionType: 'EDICAO_MISSAO',
+        summary: `Moveu a missão ${targetMission.code} para a área de ${targetArea.toUpperCase()}`,
+        targetRef: targetMission.code,
+      });
+    }
+    setDraggedMissionId(null);
+    setDragOverArea(null);
+  };
+
+  // Configuração das Áreas Técnicas da TI
+  const AREAS_CONFIG: {
+    id: MissionArea;
+    title: string;
+    subtitle: string;
+    icon: React.ComponentType<{ className?: string }>;
+    colBg: string;
+    colBorder: string;
+    dot: string;
+    badge: string;
+  }[] = [
+    {
+      id: 'redes',
+      title: 'Redes & Conectividade',
+      subtitle: 'Switches, Fibra, Wi-Fi e Roteadores',
+      icon: Network,
+      colBg: 'bg-blue-50/40',
+      colBorder: 'border-blue-200',
+      dot: 'bg-blue-600',
+      badge: 'bg-blue-100 text-blue-900 border-blue-300',
+    },
+    {
+      id: 'desenvolvimento',
+      title: 'Desenvolvimento & Sistemas',
+      subtitle: 'Software, Intranet, BD e Portais',
+      icon: Code,
+      colBg: 'bg-purple-50/40',
+      colBorder: 'border-purple-200',
+      dot: 'bg-purple-600',
+      badge: 'bg-purple-100 text-purple-900 border-purple-300',
+    },
+    {
+      id: 'hardware',
+      title: 'Hardware & Bancada',
+      subtitle: 'Computadores, Impressoras e Manutenção',
+      icon: Wrench,
+      colBg: 'bg-amber-50/40',
+      colBorder: 'border-amber-200',
+      dot: 'bg-amber-600',
+      badge: 'bg-amber-100 text-amber-900 border-amber-300',
+    },
+    {
+      id: 'geral',
+      title: 'Geral & Infraestrutura',
+      subtitle: 'Operações Gerais e Apoio Técnico',
+      icon: Layers,
+      colBg: 'bg-emerald-50/40',
+      colBorder: 'border-emerald-200',
+      dot: 'bg-emerald-600',
+      badge: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+    },
+  ];
 
   // Modais
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -120,6 +255,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formPriority, setFormPriority] = useState<MissionPriority>('normal');
+  const [formArea, setFormArea] = useState<MissionArea>('redes');
   const [formAssignedTechs, setFormAssignedTechs] = useState<string[]>([]);
   const [formDeadline, setFormDeadline] = useState('');
   const [checklistInputs, setChecklistInputs] = useState<string[]>(['']);
@@ -131,8 +267,8 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
     setFormTitle('');
     setFormDescription('');
     setFormPriority('normal');
+    setFormArea('redes');
     setFormAssignedTechs([]);
-    // Default deadline 24h
     const d = new Date(Date.now() + 24 * 3600 * 1000);
     setFormDeadline(d.toISOString().slice(0, 10));
     setChecklistInputs(['Conferência inicial de materiais e ferramentas', 'Execução da tarefa técnica']);
@@ -144,6 +280,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
     setFormTitle(m.title);
     setFormDescription(m.description);
     setFormPriority(m.priority);
+    setFormArea(getMissionArea(m));
     setFormAssignedTechs(m.assignedTechnicianIds || []);
     setFormDeadline(m.deadline ? m.deadline.slice(0, 10) : '');
     setChecklistInputs(m.checklist && m.checklist.length > 0 ? m.checklist.map(c => c.text) : ['']);
@@ -160,6 +297,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
         title: formTitle.trim(),
         description: formDescription.trim(),
         priority: formPriority,
+        area: formArea,
         assignedTechnicianIds: formAssignedTechs,
         deadline: formDeadline ? new Date(formDeadline).toISOString() : undefined,
         checklist: validChecklist.map((text, idx) => {
@@ -173,6 +311,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
         title: formTitle.trim(),
         description: formDescription.trim(),
         priority: formPriority,
+        area: formArea,
         assignedTechnicianIds: formAssignedTechs,
         deadline: formDeadline ? new Date(formDeadline).toISOString() : undefined,
         checklistItems: validChecklist,
@@ -252,7 +391,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono font-black uppercase tracking-wider text-[#27431e] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                2º GAC · Regimento Deodoro
+                2º GAC
               </span>
               {canManageMissions ? (
                 <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
@@ -275,16 +414,18 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
 
         {/* Botões de Ação do Topo: Tiragem de Faltas e Criação de Missão */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-          {/* Botão de Tiragem de Faltas (Formatura do Dia) */}
-          <button
-            type="button"
-            onClick={() => setIsAttendanceModalOpen(true)}
-            className="px-4 py-3 rounded-2xl bg-[#27431e] hover:bg-[#325727] text-[#dfb642] hover:text-white font-black text-xs flex items-center justify-center gap-2 transition-all shadow-md border border-[#cba135]/60 shrink-0 cursor-pointer"
-            title="Realizar chamada/tiragem de faltas e consultar histórico militar"
-          >
-            <ClipboardCheck className="w-4 h-4 text-[#dfb642]" />
-            <span>📋 Tiragem de Faltas (Formatura)</span>
-          </button>
+          {/* Botão de Tiragem de Faltas (Formatura do Dia - Restrito a Xerife, Aux e Chefe) */}
+          {canTakeAttendance && (
+            <button
+              type="button"
+              onClick={() => setIsAttendanceModalOpen(true)}
+              className="px-4 py-3 rounded-2xl bg-[#27431e] hover:bg-[#325727] text-[#dfb642] hover:text-white font-black text-xs flex items-center justify-center gap-2 transition-all shadow-md border border-[#cba135]/60 shrink-0 cursor-pointer"
+              title="Realizar chamada/tiragem de faltas e consultar histórico militar"
+            >
+              <ClipboardCheck className="w-4 h-4 text-[#dfb642]" />
+              <span>📋 Tiragem de Faltas (Formatura)</span>
+            </button>
+          )}
 
           {canManageMissions && (
             <button
@@ -375,6 +516,36 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {/* Alternador de Modo de Visualização */}
+          <div className="flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setViewMode('kanban')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'kanban'
+                  ? 'bg-[#1e3316] text-[#dfb642] shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Visualização em Quadro Kanban por Áreas Técnicas"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Quadro Kanban (Áreas TI)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-[#1e3316] text-[#dfb642] shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Visualização em Lista Detalhada"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>Lista Detalhada</span>
+            </button>
+          </div>
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -455,7 +626,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
         )}
       </div>
 
-      {/* Lista / Grade de Missões */}
+      {/* Renderização das Missões (Modo Kanban por Áreas vs Modo Lista) */}
       {filteredMissions.length === 0 ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 space-y-3 shadow-xs">
           <Target className="w-12 h-12 text-slate-300 mx-auto" />
@@ -466,9 +637,330 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
             {searchQuery.trim() 
               ? 'Verifique o código ou os termos pesquisados.'
               : canManageMissions 
-                ? 'O módulo é totalmente modular. Clique em "+ Nova Missão da Seção" para criar a primeira ordem de serviço para a equipe.'
+                ? 'O módulo é totalmente modular. Clique em "+ Nova Missão" acima para cadastrar a primeira ordem de operação da equipe.'
                 : 'Nenhuma ordem de operação aberta no momento.'}
           </p>
+        </div>
+      ) : viewMode === 'kanban' ? (
+        <div className="space-y-3">
+          {/* Dica Interativa de Arrastar e Soltar */}
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white border border-slate-200 text-xs text-slate-600 shadow-2xs">
+            <GripVertical className="w-4 h-4 text-[#27431e] shrink-0" />
+            <span>
+              <strong>Quadro Kanban por Áreas Técnicas da TI:</strong> Arraste e solte cards entre as colunas para remanejar a especialidade técnica da missão (Redes, Desenvolvimento, Hardware ou Geral).
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+            {AREAS_CONFIG.map((area) => {
+              const areaMissions = filteredMissions.filter(m => getMissionArea(m) === area.id);
+              const isCollapsed = collapsedMissionsColumns[area.id];
+              const isDragOver = dragOverArea === area.id;
+              const AreaIcon = area.icon;
+
+              return (
+                <div
+                  key={area.id}
+                  onDragOver={(e) => {
+                    if (!canInteract) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (dragOverArea !== area.id) setDragOverArea(area.id);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setDragOverArea(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    if (!canInteract) return;
+                    e.preventDefault();
+                    handleDropOnArea(area.id);
+                  }}
+                  className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+                    isCollapsed ? 'min-h-[85px]' : 'min-h-[450px]'
+                  } ${
+                    isDragOver
+                      ? 'bg-emerald-50 border-2 border-dashed border-[#27431e] ring-4 ring-[#27431e]/15'
+                      : `${area.colBg} ${area.colBorder}`
+                  }`}
+                >
+                  {/* Cabeçalho da Coluna de Área */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-2.5 h-2.5 rounded-full ${area.dot} shrink-0`}></span>
+                      <span className="font-bold text-xs uppercase tracking-wider text-slate-800 truncate flex items-center gap-1">
+                        <AreaIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{area.title}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-800 border border-slate-200">
+                        {areaMissions.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleAreaCollapse(area.id)}
+                        className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                        title={isCollapsed ? 'Expandir coluna' : 'Contrair coluna'}
+                      >
+                        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isCollapsed ? (
+                    <div
+                      onClick={() => toggleAreaCollapse(area.id)}
+                      className="py-4 text-center cursor-pointer hover:bg-slate-200/50 rounded-xl transition-colors space-y-1"
+                      title="Clique para expandir"
+                    >
+                      <span className="text-xs text-slate-400 font-bold block">Coluna contraída</span>
+                      <span className="text-[10px] text-slate-500 underline">Clique para ver as missões</span>
+                    </div>
+                  ) : (
+                    <>
+                      {isDragOver && (
+                        <div className="p-3 text-center rounded-xl bg-white border border-[#27431e] text-xs font-bold text-[#1e3316] animate-pulse shadow-xs">
+                          ⬇️ Solte aqui para transferir para {area.title}
+                        </div>
+                      )}
+
+                      <div className="space-y-3">
+                        {areaMissions.map((mission) => {
+                          const assignedTechs = technicians.filter(t => mission.assignedTechnicianIds?.includes(t.id));
+                          const completedChecklist = mission.checklist?.filter(c => c.done).length || 0;
+                          const totalChecklist = mission.checklist?.length || 0;
+                          const progressPct = totalChecklist > 0 ? Math.round((completedChecklist / totalChecklist) * 100) : 0;
+                          const isThisTopPriority = Boolean(mission.isTopPriority && mission.status !== 'concluida');
+                          const isCompleted = mission.status === 'concluida';
+
+                          return (
+                            <div
+                              key={mission.id}
+                              draggable={canInteract}
+                              onDragStart={(e) => {
+                                if (!canInteract) return;
+                                e.dataTransfer.setData('text/plain', mission.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                                setDraggedMissionId(mission.id);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedMissionId(null);
+                                setDragOverArea(null);
+                              }}
+                              onClick={() => setSelectedMission(mission)}
+                              className={`p-3.5 rounded-2xl border bg-white transition-all flex flex-col justify-between cursor-pointer group relative shadow-xs hover:shadow-md ${
+                                canInteract ? 'cursor-grab active:cursor-grabbing hover:border-[#27431e]' : ''
+                              } ${draggedMissionId === mission.id ? 'opacity-40 scale-95 border-dashed border-[#27431e]' : ''} ${
+                                isCompleted
+                                  ? 'border-slate-200 opacity-60 bg-slate-50/70 text-slate-500 hover:opacity-85'
+                                  : isThisTopPriority
+                                    ? 'border-[#dfb642] ring-2 ring-[#dfb642] shadow-xl bg-amber-50/20 scale-[1.01]'
+                                    : mission.priority === 'urgente'
+                                      ? 'border-red-400 ring-1 ring-red-400 shadow-xs'
+                                      : 'border-slate-200 hover:border-[#27431e]'
+                              }`}
+                            >
+                              <div>
+                                {isThisTopPriority && (
+                                  <div className="mb-2 px-2 py-1 rounded-lg bg-[#1e3316] text-[#dfb642] border border-[#cba135] text-[10px] font-black flex items-center justify-between gap-1 shadow-xs">
+                                    <div className="flex items-center gap-1">
+                                      <Star className="w-3 h-3 fill-[#dfb642] text-[#dfb642]" />
+                                      <span>PRIORIDADE MÁXIMA</span>
+                                    </div>
+                                    {mission.priorityDesignatedBy && (
+                                      <span className="text-[9px] text-amber-200 font-mono truncate">
+                                        por: {mission.priorityDesignatedBy}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between gap-1.5 mb-2">
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    {canInteract && (
+                                      <GripVertical className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-600 shrink-0" />
+                                    )}
+                                    <span className="font-mono text-xs font-black text-[#1e3316] bg-slate-100 px-2 py-0.5 rounded-md">
+                                      {mission.code}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {canSetPriority && mission.status !== 'concluida' && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleToggleTopPriority(e, mission)}
+                                        className={`p-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                          mission.isTopPriority
+                                            ? 'bg-amber-400 text-amber-950 hover:bg-amber-500 shadow-xs'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-900 border border-slate-200'
+                                        }`}
+                                        title={mission.isTopPriority ? 'Remover prioridade' : 'Definir como prioridade'}
+                                      >
+                                        <Star className={`w-3 h-3 ${mission.isTopPriority ? 'fill-amber-950 text-amber-950' : 'text-slate-500'}`} />
+                                      </button>
+                                    )}
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase font-mono ${getPriorityBadge(mission.priority)}`}>
+                                      {mission.priority}
+                                    </span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase font-mono border ${getStatusBadge(mission.status)}`}>
+                                      {getStatusLabel(mission.status)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <h4 className="text-xs font-bold text-slate-900 leading-snug group-hover:text-[#1e3316] transition-colors line-clamp-2">
+                                  {mission.title}
+                                </h4>
+                                <p className="text-[11px] text-slate-600 line-clamp-2 mt-1 leading-relaxed">
+                                  {mission.description}
+                                </p>
+
+                                {totalChecklist > 0 && (
+                                  <div className="mt-2.5 space-y-1">
+                                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 font-semibold">
+                                      <span>Checklist</span>
+                                      <span>{completedChecklist}/{totalChecklist} ({progressPct}%)</span>
+                                    </div>
+                                    <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                                      <div 
+                                        className={`h-full transition-all duration-300 ${
+                                          progressPct === 100 ? 'bg-emerald-500' : 'bg-[#27431e]'
+                                        }`}
+                                        style={{ width: `${progressPct}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <Users className="w-3 h-3 text-[#27431e] shrink-0" />
+                                    <span className="truncate text-[10px] font-medium">
+                                      {assignedTechs.length > 0 
+                                        ? assignedTechs.map(t => t.name).join(', ')
+                                        : 'Sem militar escalado'}
+                                    </span>
+                                  </div>
+                                  {mission.notes && mission.notes.length > 0 && (
+                                    <span className="flex items-center gap-1 text-[10px] font-mono text-slate-400 shrink-0">
+                                      <MessageSquare className="w-3 h-3 text-amber-600" />
+                                      {mission.notes.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
+                                {canInteract && mission.status !== 'concluida' ? (
+                                  <div className="flex items-center gap-1">
+                                    {mission.status === 'pendente' && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          onUpdateMission(mission.id, { status: 'em_andamento' });
+                                        }}
+                                        className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-[10px] font-bold border border-blue-200 transition-colors cursor-pointer"
+                                        title="Iniciar operação"
+                                      >
+                                        ▶ Iniciar
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const nowIso = new Date().toISOString();
+                                        const allDoneChecklist = (mission.checklist || []).map(c => ({ ...c, done: true }));
+                                        onUpdateMission(mission.id, { 
+                                          status: 'concluida', 
+                                          completedAt: nowIso,
+                                          checklist: allDoneChecklist
+                                        });
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black shadow-xs border border-emerald-700 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                      title="Concluir esta missão em 1 clique"
+                                    >
+                                      <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+                                      <span>Concluir</span>
+                                    </button>
+                                  </div>
+                                ) : mission.status === 'concluida' ? (
+                                  <span className="text-emerald-700 text-[10px] font-bold flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Concluída</span>
+                                  </span>
+                                ) : null}
+
+                                <div className="flex items-center gap-0.5 ml-auto">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCopyMission(mission);
+                                    }}
+                                    className="p-1 rounded-md text-slate-400 hover:text-emerald-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Copiar dados"
+                                  >
+                                    {copiedMissionId === mission.id ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                  {canManageMissions && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openEditModal(mission);
+                                      }}
+                                      className="p-1 rounded-md text-slate-400 hover:text-[#1e3316] hover:bg-slate-100 transition-colors cursor-pointer"
+                                      title="Editar"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  {canDeleteMissions && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeletingMissionId(mission.id);
+                                      }}
+                                      className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                      title="Excluir"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => setSelectedMission(mission)}
+                                    className="p-1 rounded-md text-slate-400 hover:text-slate-800 transition-colors"
+                                    title="Ver detalhes"
+                                  >
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {areaMissions.length === 0 && (
+                          <div className="p-6 text-center text-xs text-slate-400 bg-white/60 rounded-xl border border-dashed border-slate-200">
+                            Nenhuma missão nesta área técnica.
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -477,24 +969,69 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
             const completedChecklist = mission.checklist?.filter(c => c.done).length || 0;
             const totalChecklist = mission.checklist?.length || 0;
             const progressPct = totalChecklist > 0 ? Math.round((completedChecklist / totalChecklist) * 100) : 0;
+            const isThisTopPriority = Boolean(mission.isTopPriority && mission.status !== 'concluida');
+            const isDimmed = hasActiveTopPriority && !isThisTopPriority;
+            const missionArea = getMissionArea(mission);
+            const areaConfig = AREAS_CONFIG.find(a => a.id === missionArea);
 
             return (
               <div
                 key={mission.id}
                 onClick={() => setSelectedMission(mission)}
-                className={`p-5 rounded-3xl border bg-white shadow-xs hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group relative ${
-                  mission.priority === 'urgente' && mission.status !== 'concluida' 
-                    ? 'border-red-400 ring-1 ring-red-400' 
-                    : 'border-slate-200 hover:border-[#27431e]'
+                className={`p-5 rounded-3xl border bg-white transition-all flex flex-col justify-between cursor-pointer group relative ${
+                  isThisTopPriority
+                    ? 'border-[#dfb642] ring-2 ring-[#dfb642] shadow-xl bg-amber-50/20 scale-[1.01]'
+                    : isDimmed
+                      ? 'border-slate-200 opacity-40 hover:opacity-100 hover:shadow-md'
+                      : mission.priority === 'urgente' && mission.status !== 'concluida' 
+                        ? 'border-red-400 ring-1 ring-red-400 shadow-xs hover:shadow-md' 
+                        : 'border-slate-200 hover:border-[#27431e] shadow-xs hover:shadow-md'
                 }`}
               >
                 <div>
+                  {/* Destaque no Topo para Missão Prioritária da Seção */}
+                  {isThisTopPriority && (
+                    <div className="mb-3 px-3 py-1.5 rounded-xl bg-[#1e3316] text-[#dfb642] border border-[#cba135] text-[11px] font-black flex items-center justify-between gap-1 shadow-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Star className="w-3.5 h-3.5 fill-[#dfb642] text-[#dfb642]" />
+                        <span>MISSÃO PRIORITÁRIA DA SEÇÃO</span>
+                      </div>
+                      {mission.priorityDesignatedBy && (
+                        <span className="text-[10px] text-amber-200 font-mono truncate">
+                          por: {mission.priorityDesignatedBy}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Topo do Card */}
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="font-mono text-xs font-black text-[#1e3316] tracking-tight bg-slate-100 px-2.5 py-1 rounded-lg">
-                      {mission.code}
-                    </span>
                     <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs font-black text-[#1e3316] tracking-tight bg-slate-100 px-2.5 py-1 rounded-lg">
+                        {mission.code}
+                      </span>
+                      {areaConfig && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${areaConfig.badge}`}>
+                          {areaConfig.title.split(' ')[0]}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {canSetPriority && mission.status !== 'concluida' && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleTopPriority(e, mission)}
+                          className={`p-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                            mission.isTopPriority
+                              ? 'bg-amber-400 text-amber-950 hover:bg-amber-500 shadow-xs'
+                              : 'bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-900 border border-slate-200'
+                          }`}
+                          title={mission.isTopPriority ? 'Remover prioridade da seção' : 'Definir como prioridade da seção'}
+                        >
+                          <Star className={`w-3.5 h-3.5 ${mission.isTopPriority ? 'fill-amber-950 text-amber-950' : 'text-slate-500'}`} />
+                          <span className="text-[10px] hidden sm:inline">{mission.isTopPriority ? 'Prioritária' : 'Prioridade'}</span>
+                        </button>
+                      )}
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${getPriorityBadge(mission.priority)}`}>
                         {mission.priority}
                       </span>
@@ -547,6 +1084,16 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {/* Lembrete de prioridade militar designada */}
+                  {isThisTopPriority && mission.priorityDesignatedBy && (
+                    <div className="mt-3 p-2 rounded-xl bg-amber-100/90 border border-amber-300 text-[10px] sm:text-[11px] font-mono text-amber-950 flex items-center gap-1.5">
+                      <Star className="w-3.5 h-3.5 fill-amber-700 text-amber-700 shrink-0" />
+                      <span className="truncate">
+                        Designado como <strong>PRIORIDADE</strong> por: {mission.priorityDesignatedBy}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Rodapé do Card com Ações Rápidas */}
@@ -734,7 +1281,23 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Área Técnica da TI
+                  </label>
+                  <select
+                    value={formArea}
+                    onChange={(e) => setFormArea(e.target.value as MissionArea)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold bg-white focus:ring-2 focus:ring-[#27431e]"
+                  >
+                    <option value="redes">Redes & Conectividade</option>
+                    <option value="desenvolvimento">Desenvolvimento & Sistemas</option>
+                    <option value="hardware">Hardware & Bancada</option>
+                    <option value="geral">Geral & Infraestrutura</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                     Prioridade da Missão
@@ -742,7 +1305,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
                   <select
                     value={formPriority}
                     onChange={(e) => setFormPriority(e.target.value as any)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold bg-white"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold bg-white focus:ring-2 focus:ring-[#27431e]"
                   >
                     <option value="urgente">Urgente (Imediato)</option>
                     <option value="alta">Alta</option>
@@ -759,7 +1322,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
                     type="date"
                     value={formDeadline}
                     onChange={(e) => setFormDeadline(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold bg-white"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-bold bg-white focus:ring-2 focus:ring-[#27431e]"
                   />
                 </div>
               </div>

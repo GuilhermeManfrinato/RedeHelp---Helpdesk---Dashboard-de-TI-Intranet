@@ -25,7 +25,9 @@ import {
   Trash2,
   Copy,
   Check,
-  GripVertical
+  GripVertical,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { NotebookLoan, Department, AccessibilitySettings, MilitaryUser, LoanHistoryItem, LoanMessage } from '../types';
 
@@ -96,6 +98,18 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
   const [draggedLoanId, setDraggedLoanId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<'em_uso' | 'prorrogado' | 'atrasado' | 'devolvido' | null>(null);
   const [quickReturnLoan, setQuickReturnLoan] = useState<NotebookLoan | null>(null);
+
+  // Controle de Colunas Contraídas do Quadro Kanban
+  const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({
+    em_uso: false,
+    prorrogado: false,
+    atrasado: false,
+    devolvido: false,
+  });
+
+  const toggleColumnCollapse = (colKey: string) => {
+    setCollapsedColumns(prev => ({ ...prev, [colKey]: !prev[colKey] }));
+  };
 
   // Modal Exclusão de Cautela (Exclusivo Chefe da Seção)
   const [loanToDelete, setLoanToDelete] = useState<NotebookLoan | null>(null);
@@ -501,10 +515,10 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
         className={`p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all space-y-2.5 group ${
           canInteract ? 'cursor-grab active:cursor-grabbing hover:border-[#27431e]' : ''
         } ${draggedLoanId === loan.id ? 'opacity-40 scale-95 border-dashed border-[#27431e] ring-2 ring-[#27431e]/20' : ''} ${
-          isOverdue 
-            ? 'border-red-400 ring-1 ring-red-400 bg-red-50/20' 
-            : isReturned
-              ? 'border-slate-200 opacity-80 bg-slate-50/50'
+          isReturned
+            ? 'border-slate-200 opacity-60 bg-slate-50/70 text-slate-500 hover:opacity-85'
+            : isOverdue 
+              ? 'border-red-400 ring-1 ring-red-400 bg-red-50/20' 
               : isProrrogado
                 ? 'border-amber-300 ring-1 ring-amber-200'
                 : 'border-slate-200'
@@ -974,7 +988,9 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 e.preventDefault();
                 handleDropOnLoanColumn('em_uso');
               }}
-              className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[450px] ${
+              className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+                collapsedColumns['em_uso'] ? 'min-h-[85px]' : 'min-h-[450px]'
+              } ${
                 dragOverColumn === 'em_uso'
                   ? 'bg-emerald-50 border-2 border-dashed border-emerald-600 ring-4 ring-emerald-500/20'
                   : 'bg-slate-100/70 border-slate-200'
@@ -985,27 +1001,50 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
                   1. Em Uso (No Prazo)
                 </span>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-emerald-800 border border-slate-200">
-                  {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (!l.extensionCount || l.extensionCount === 0)).length}
-                </span>
-              </div>
-
-              {dragOverColumn === 'em_uso' && (
-                <div className="p-3 text-center rounded-xl bg-white border border-emerald-600 text-xs font-bold text-emerald-900 animate-pulse shadow-xs">
-                  ⬇️ Solte aqui para colocar em Uso (No Prazo)
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-emerald-800 border border-slate-200">
+                    {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (!l.extensionCount || l.extensionCount === 0)).length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleColumnCollapse('em_uso')}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                    title={collapsedColumns['em_uso'] ? 'Expandir coluna' : 'Contrair coluna'}
+                  >
+                    {collapsedColumns['em_uso'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
-              )}
-
-              <div className="space-y-3">
-                {filteredLoans
-                  .filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (!l.extensionCount || l.extensionCount === 0))
-                  .map((loan) => renderKanbanCard(loan))}
-                {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (!l.extensionCount || l.extensionCount === 0)).length === 0 && (
-                  <div className="p-6 text-center text-xs text-slate-400 bg-white/50 rounded-xl border border-dashed border-slate-200">
-                    Nenhum notebook nesta etapa.
-                  </div>
-                )}
               </div>
+
+              {collapsedColumns['em_uso'] ? (
+                <div 
+                  onClick={() => toggleColumnCollapse('em_uso')}
+                  className="py-4 text-center cursor-pointer hover:bg-slate-200/50 rounded-xl transition-colors space-y-1"
+                  title="Clique para expandir"
+                >
+                  <span className="text-xs text-slate-400 font-bold block">Coluna contraída</span>
+                  <span className="text-[10px] text-slate-500 underline">Clique para ver os cards</span>
+                </div>
+              ) : (
+                <>
+                  {dragOverColumn === 'em_uso' && (
+                    <div className="p-3 text-center rounded-xl bg-white border border-emerald-600 text-xs font-bold text-emerald-900 animate-pulse shadow-xs">
+                      ⬇️ Solte aqui para colocar em Uso (No Prazo)
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {filteredLoans
+                      .filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (!l.extensionCount || l.extensionCount === 0))
+                      .map((loan) => renderKanbanCard(loan))}
+                    {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (!l.extensionCount || l.extensionCount === 0)).length === 0 && (
+                      <div className="p-6 text-center text-xs text-slate-400 bg-white/50 rounded-xl border border-dashed border-slate-200">
+                        Nenhum notebook nesta etapa.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Coluna 2: Prazo Prorrogado */}
@@ -1026,7 +1065,9 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 e.preventDefault();
                 handleDropOnLoanColumn('prorrogado');
               }}
-              className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[450px] ${
+              className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+                collapsedColumns['prorrogado'] ? 'min-h-[85px]' : 'min-h-[450px]'
+              } ${
                 dragOverColumn === 'prorrogado'
                   ? 'bg-amber-50 border-2 border-dashed border-amber-600 ring-4 ring-amber-500/20'
                   : 'bg-amber-50/40 border-amber-200/80'
@@ -1037,27 +1078,50 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                   2. Prazo Prorrogado
                 </span>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-amber-800 border border-amber-200">
-                  {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (l.extensionCount && l.extensionCount > 0)).length}
-                </span>
-              </div>
-
-              {dragOverColumn === 'prorrogado' && (
-                <div className="p-3 text-center rounded-xl bg-white border border-amber-600 text-xs font-bold text-amber-900 animate-pulse shadow-xs">
-                  ⬇️ Solte aqui para Prorrogar Prazo de Devolução
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-amber-800 border border-amber-200">
+                    {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (l.extensionCount && l.extensionCount > 0)).length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleColumnCollapse('prorrogado')}
+                    className="p-1 rounded-md text-amber-600 hover:text-amber-900 hover:bg-amber-200 transition-colors cursor-pointer"
+                    title={collapsedColumns['prorrogado'] ? 'Expandir coluna' : 'Contrair coluna'}
+                  >
+                    {collapsedColumns['prorrogado'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
-              )}
-
-              <div className="space-y-3">
-                {filteredLoans
-                  .filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (l.extensionCount && l.extensionCount > 0))
-                  .map((loan) => renderKanbanCard(loan))}
-                {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (l.extensionCount && l.extensionCount > 0)).length === 0 && (
-                  <div className="p-6 text-center text-xs text-slate-400 bg-white/50 rounded-xl border border-dashed border-slate-200">
-                    Nenhuma prorrogação ativa.
-                  </div>
-                )}
               </div>
+
+              {collapsedColumns['prorrogado'] ? (
+                <div 
+                  onClick={() => toggleColumnCollapse('prorrogado')}
+                  className="py-4 text-center cursor-pointer hover:bg-amber-100/50 rounded-xl transition-colors space-y-1"
+                  title="Clique para expandir"
+                >
+                  <span className="text-xs text-amber-800/60 font-bold block">Coluna contraída</span>
+                  <span className="text-[10px] text-amber-800 underline">Clique para ver os cards</span>
+                </div>
+              ) : (
+                <>
+                  {dragOverColumn === 'prorrogado' && (
+                    <div className="p-3 text-center rounded-xl bg-white border border-amber-600 text-xs font-bold text-amber-900 animate-pulse shadow-xs">
+                      ⬇️ Solte aqui para Prorrogar Prazo de Devolução
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {filteredLoans
+                      .filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (l.extensionCount && l.extensionCount > 0))
+                      .map((loan) => renderKanbanCard(loan))}
+                    {filteredLoans.filter(l => l.status === 'cautelado' && !isLoanOverdue(l) && (l.extensionCount && l.extensionCount > 0)).length === 0 && (
+                      <div className="p-6 text-center text-xs text-slate-400 bg-white/50 rounded-xl border border-dashed border-slate-200">
+                        Nenhuma prorrogação ativa.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Coluna 3: Em Atraso (Vencidos) */}
@@ -1078,7 +1142,9 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 e.preventDefault();
                 handleDropOnLoanColumn('atrasado');
               }}
-              className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[450px] ${
+              className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+                collapsedColumns['atrasado'] ? 'min-h-[85px]' : 'min-h-[450px]'
+              } ${
                 dragOverColumn === 'atrasado'
                   ? 'bg-red-50 border-2 border-dashed border-red-600 ring-4 ring-red-500/20'
                   : 'bg-red-50/50 border-red-200'
@@ -1089,27 +1155,50 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
                   3. Em Atraso / Vencidos
                 </span>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-red-600 text-white shadow-xs">
-                  {filteredLoans.filter(l => l.status === 'cautelado' && isLoanOverdue(l)).length}
-                </span>
-              </div>
-
-              {dragOverColumn === 'atrasado' && (
-                <div className="p-3 text-center rounded-xl bg-white border border-red-600 text-xs font-bold text-red-900 animate-pulse shadow-xs">
-                  ⬇️ Solte aqui para marcar como Em Atraso / Vencido
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-red-600 text-white shadow-xs">
+                    {filteredLoans.filter(l => l.status === 'cautelado' && isLoanOverdue(l)).length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleColumnCollapse('atrasado')}
+                    className="p-1 rounded-md text-red-400 hover:text-red-700 hover:bg-red-200 transition-colors cursor-pointer"
+                    title={collapsedColumns['atrasado'] ? 'Expandir coluna' : 'Contrair coluna'}
+                  >
+                    {collapsedColumns['atrasado'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
-              )}
-
-              <div className="space-y-3">
-                {filteredLoans
-                  .filter(l => l.status === 'cautelado' && isLoanOverdue(l))
-                  .map((loan) => renderKanbanCard(loan))}
-                {filteredLoans.filter(l => l.status === 'cautelado' && isLoanOverdue(l)).length === 0 && (
-                  <div className="p-6 text-center text-xs text-emerald-600 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 font-medium">
-                    Excelente! Nenhuma devolução em atraso.
-                  </div>
-                )}
               </div>
+
+              {collapsedColumns['atrasado'] ? (
+                <div 
+                  onClick={() => toggleColumnCollapse('atrasado')}
+                  className="py-4 text-center cursor-pointer hover:bg-red-100/50 rounded-xl transition-colors space-y-1"
+                  title="Clique para expandir"
+                >
+                  <span className="text-xs text-red-400 font-bold block">Coluna contraída</span>
+                  <span className="text-[10px] text-red-600 underline">Clique para ver os cards</span>
+                </div>
+              ) : (
+                <>
+                  {dragOverColumn === 'atrasado' && (
+                    <div className="p-3 text-center rounded-xl bg-white border border-red-600 text-xs font-bold text-red-900 animate-pulse shadow-xs">
+                      ⬇️ Solte aqui para marcar como Em Atraso / Vencido
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {filteredLoans
+                      .filter(l => l.status === 'cautelado' && isLoanOverdue(l))
+                      .map((loan) => renderKanbanCard(loan))}
+                    {filteredLoans.filter(l => l.status === 'cautelado' && isLoanOverdue(l)).length === 0 && (
+                      <div className="p-6 text-center text-xs text-emerald-600 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 font-medium">
+                        Excelente! Nenhuma devolução em atraso.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Coluna 4: Devolvidos / No Depósito */}
@@ -1130,7 +1219,9 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 e.preventDefault();
                 handleDropOnLoanColumn('devolvido');
               }}
-              className={`p-3.5 rounded-2xl border transition-all space-y-3 min-h-[450px] ${
+              className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+                collapsedColumns['devolvido'] ? 'min-h-[85px]' : 'min-h-[450px]'
+              } ${
                 dragOverColumn === 'devolvido'
                   ? 'bg-slate-200/80 border-2 border-dashed border-slate-700 ring-4 ring-slate-600/20'
                   : 'bg-slate-100/70 border-slate-200'
@@ -1141,27 +1232,50 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-slate-600"></span>
                   4. Devolvidos / Depósito
                 </span>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                  {filteredLoans.filter(l => l.status === 'devolvido').length}
-                </span>
-              </div>
-
-              {dragOverColumn === 'devolvido' && (
-                <div className="p-3 text-center rounded-xl bg-white border border-slate-700 text-xs font-bold text-slate-900 animate-pulse shadow-xs">
-                  ⬇️ Solte aqui para Realizar Descautela (Devolver ao Depósito)
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                    {filteredLoans.filter(l => l.status === 'devolvido').length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleColumnCollapse('devolvido')}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+                    title={collapsedColumns['devolvido'] ? 'Expandir coluna' : 'Contrair coluna'}
+                  >
+                    {collapsedColumns['devolvido'] ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
                 </div>
-              )}
-
-              <div className="space-y-3">
-                {filteredLoans
-                  .filter(l => l.status === 'devolvido')
-                  .map((loan) => renderKanbanCard(loan))}
-                {filteredLoans.filter(l => l.status === 'devolvido').length === 0 && (
-                  <div className="p-6 text-center text-xs text-slate-400 bg-white/50 rounded-xl border border-dashed border-slate-200">
-                    Nenhum registro devolvido no filtro.
-                  </div>
-                )}
               </div>
+
+              {collapsedColumns['devolvido'] ? (
+                <div 
+                  onClick={() => toggleColumnCollapse('devolvido')}
+                  className="py-4 text-center cursor-pointer hover:bg-slate-200/50 rounded-xl transition-colors space-y-1"
+                  title="Clique para expandir"
+                >
+                  <span className="text-xs text-slate-400 font-bold block">Coluna contraída</span>
+                  <span className="text-[10px] text-slate-500 underline">Clique para ver os cards</span>
+                </div>
+              ) : (
+                <>
+                  {dragOverColumn === 'devolvido' && (
+                    <div className="p-3 text-center rounded-xl bg-white border border-slate-700 text-xs font-bold text-slate-900 animate-pulse shadow-xs">
+                      ⬇️ Solte aqui para Realizar Descautela (Devolver ao Depósito)
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {filteredLoans
+                      .filter(l => l.status === 'devolvido')
+                      .map((loan) => renderKanbanCard(loan))}
+                    {filteredLoans.filter(l => l.status === 'devolvido').length === 0 && (
+                      <div className="p-6 text-center text-xs text-slate-400 bg-white/50 rounded-xl border border-dashed border-slate-200">
+                        Nenhum registro devolvido no filtro.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
           </div>
