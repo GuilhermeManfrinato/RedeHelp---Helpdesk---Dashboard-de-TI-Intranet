@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="#-sobre-o-projeto">Sobre</a> •
+  <a href="#-sobre-o-projeto">Sobre</a>
 </p>
 
 ---
