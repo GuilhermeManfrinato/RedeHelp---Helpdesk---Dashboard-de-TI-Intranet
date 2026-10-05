@@ -1,0 +1,385 @@
+{
+  "departments": [
+    {
+      "id": "dept-cmt",
+      "name": "Comando & Subcomando (Cmt / S Cmt)",
+      "code": "CMDO",
+      "color": "#1e3316",
+      "iconName": "Shield",
+      "managerName": "Cel Silva Ramos",
+      "description": "Gabinete do Comando do Regimento Deodoro e Estado-Maior."
+    },
+    {
+      "id": "dept-s1",
+      "name": "1ª Seção - Pessoal (SPes / S1)",
+      "code": "1ª SEÇÃO",
+      "color": "#2d4a22",
+      "iconName": "Users",
+      "managerName": "Cap Oliveira",
+      "description": "Efetivo do Regimento, alterações, férias e Boletim Interno (BI)."
+    },
+    {
+      "id": "dept-s2",
+      "name": "2ª Seção - Inteligência (SInt / S2)",
+      "code": "2ª SEÇÃO",
+      "color": "#36582a",
+      "iconName": "Lock",
+      "managerName": "Cap Ferreira",
+      "description": "Segurança orgânica e credenciamento militar."
+    },
+    {
+      "id": "dept-s3",
+      "name": "3ª Seção - Operações & Instrução (SOp / S3)",
+      "code": "3ª SEÇÃO",
+      "color": "#426c34",
+      "iconName": "Crosshair",
+      "managerName": "Maj Nogueira",
+      "description": "Instruções de Artilharia, tiros de obuseiros e manobras do Regimento."
+    },
+    {
+      "id": "dept-s4",
+      "name": "4ª Seção - Logística & Suprimento (SLog / S4)",
+      "code": "4ª SEÇÃO",
+      "color": "#855e1a",
+      "iconName": "Truck",
+      "managerName": "Cap Mendes Braga",
+      "description": "Manutenção de obuseiros, munição, viaturas e suprimento do quartel."
+    },
+    {
+      "id": "dept-salc",
+      "name": "SALC (Licitações & Contratos)",
+      "code": "SALC",
+      "color": "#1a496b",
+      "iconName": "FileCheck",
+      "managerName": "1º Ten Albuquerque",
+      "description": "Aquisições, pregões eletrônicos e compras do Regimento."
+    },
+    {
+      "id": "dept-fisc",
+      "name": "Fiscalização Administrativa & Pagadoria",
+      "code": "FISC ADM",
+      "color": "#713f12",
+      "iconName": "DollarSign",
+      "managerName": "Cap Vasconcelos",
+      "description": "Execução orçamentária e pagamento do efetivo do 2º GAC."
+    },
+    {
+      "id": "dept-bia",
+      "name": "Baterias de Obuses (1ª Bia O / 2ª Bia O / Bia Cmdo)",
+      "code": "BIAS O",
+      "color": "#5b21b6",
+      "iconName": "Crosshair",
+      "managerName": "Cap Dantas",
+      "description": "Linhas de fogo, observação e comando das baterias de tiro."
+    },
+    {
+      "id": "dept-sau",
+      "name": "Formação Sanitária de Regimento (FSR)",
+      "code": "FSR",
+      "color": "#991b1b",
+      "iconName": "HeartPulse",
+      "managerName": "1º Ten Med Daniele",
+      "description": "Atendimento de saúde e perícias médicas da guarnição."
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-printer",
+      "name": "Impressora / Impressão de Boletim",
+      "icon": "Printer",
+      "defaultPriority": "media",
+      "simpleInstructions": "Papel preso, toner fraco, falha ao imprimir documentos oficiais ou Boletim Interno."
+    },
+    {
+      "id": "cat-network",
+      "name": "Conexão de Rede / Internet do Quartel",
+      "icon": "Wifi",
+      "defaultPriority": "alta",
+      "simpleInstructions": "Sem conexão de rede nos computadores do quartel, sites não abrem ou cabo desconectado."
+    },
+    {
+      "id": "cat-systems",
+      "name": "Sistemas Militares (SISBOL / Comprasnet / SIGELOG)",
+      "icon": "Layers",
+      "defaultPriority": "alta",
+      "simpleInstructions": "Falha ao acessar o sistema de ordens do quartel, assinatura digital ou token."
+    },
+    {
+      "id": "cat-computer",
+      "name": "Computador Travando / Não Liga",
+      "icon": "Monitor",
+      "defaultPriority": "alta",
+      "simpleInstructions": "Tela preta, travamento no meio do serviço, computador não liga ou ruído anormal."
+    },
+    {
+      "id": "cat-password",
+      "name": "Esqueci a Senha / Usuário Bloqueado",
+      "icon": "KeyRound",
+      "defaultPriority": "media",
+      "simpleInstructions": "Bloqueio na senha do computador ou necessidade de redefinição de acesso."
+    },
+    {
+      "id": "cat-email",
+      "name": "Correio Eletrônico (Webmail do Quartel)",
+      "icon": "Mail",
+      "defaultPriority": "media",
+      "simpleInstructions": "Falha no envio ou recebimento de e-mails oficiais da OM."
+    },
+    {
+      "id": "cat-other",
+      "name": "Outro Problema / Solicitação Diversa",
+      "icon": "HelpCircle",
+      "defaultPriority": "baixa",
+      "simpleInstructions": "Instalação de programa homologado, teclado, mouse ou dúvida geral."
+    }
+  ],
+  "military_users": [
+    {
+      "id": "usr-dev",
+      "username": "dev",
+      "password": "fT?t7pTpk=0&_H7fW6@info26",
+      "name": "Guilherme Manfrinato",
+      "rank": "Dev",
+      "warName": "Manfrinato",
+      "role": "CH-SECINFO",
+      "active": true,
+      "email": "manfrinato.ti@eb.mil.br",
+      "specialty": "Desenvolvedor do Sistema & Administrador Geral (Acesso Total)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-dasdeves",
+      "username": "dasdeves",
+      "password": "H3b3rt0n2001@",
+      "name": "3º Sgt Das Deves",
+      "rank": "3º Sgt",
+      "warName": "Das Deves",
+      "role": "CH-SECINFO",
+      "active": true,
+      "email": "dasdeves@eb.mil.br",
+      "specialty": "Chefe da Seção de Informática & Telemática (CHSECINFO)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-cavalcanti",
+      "username": "cavalcanti",
+      "password": "C4v4lc4nti2620@",
+      "name": "3º Sgt Cavalcanti",
+      "rank": "3º Sgt",
+      "warName": "Cavalcanti",
+      "role": "CH-SECINFO",
+      "active": true,
+      "email": "cavalcanti@eb.mil.br",
+      "specialty": "Chefe da Seção de Informática & Telemática (CHSECINFO)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-castro",
+      "username": "castro",
+      "password": "Fl59381286789.",
+      "name": "Sd Castro",
+      "rank": "Sd",
+      "warName": "Castro",
+      "role": "AUX-SECINFO",
+      "active": true,
+      "email": "castro@eb.mil.br",
+      "specialty": "Auxiliar da Seção de Informática (AUXSECINFO)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-arantes",
+      "username": "arantes",
+      "password": "4r4nt3s2620@",
+      "name": "Sd Arantes",
+      "rank": "Sd",
+      "warName": "Arantes",
+      "role": "CH-XERIFEINFO",
+      "active": true,
+      "email": "arantes@eb.mil.br",
+      "specialty": "Xerife do Corpo Técnico (XERIFESECINFO)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-machado",
+      "username": "machado",
+      "password": "m4ch4d02620@",
+      "name": "Sd Machado",
+      "rank": "Sd",
+      "warName": "Machado",
+      "role": "CH-TECNICOINFO",
+      "active": true,
+      "email": "machado@eb.mil.br",
+      "specialty": "Técnico de Informática (TECINFO)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-oliveira",
+      "username": "oliveira",
+      "password": "0liv3ir42620@",
+      "name": "Sd Oliveira",
+      "rank": "Sd",
+      "warName": "Oliveira",
+      "role": "CH-TECNICOINFO",
+      "active": true,
+      "email": "oliveira@eb.mil.br",
+      "specialty": "Técnico de Informática (TECINFO)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-vecchiato",
+      "username": "vecchiato",
+      "password": "v3cchi4t02620@",
+      "name": "Sd Vecchiato",
+      "rank": "Sd",
+      "warName": "Vecchiato",
+      "role": "CH-TECNICOINFO",
+      "active": true,
+      "email": "vecchiato@eb.mil.br",
+      "specialty": "Técnico de Informática (TECINFO)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    },
+    {
+      "id": "usr-tvinfo",
+      "username": "tvinfo",
+      "password": "123",
+      "name": "Painel TV da Seção",
+      "rank": "TI",
+      "warName": "Telão Sala TI",
+      "role": "CH-TVINFO",
+      "active": true,
+      "email": "tv.informatica@eb.mil.br",
+      "specialty": "Exibição de Status e Chamados (Sem Interação)",
+      "createdAt": "2026-10-05T00:00:00.000Z"
+    }
+  ],
+  "technicians": [
+    {
+      "id": "tech-dev",
+      "name": "Guilherme Manfrinato",
+      "role": "Desenvolvedor / Administrador de TI",
+      "email": "manfrinato.ti@eb.mil.br",
+      "avatar": "GM",
+      "active": true,
+      "specialty": "Desenvolvimento e Infraestrutura de TI"
+    },
+    {
+      "id": "tech-dasdeves",
+      "name": "3º Sgt Das Deves",
+      "role": "Chefe da Seção de Informática",
+      "email": "dasdeves@eb.mil.br",
+      "avatar": "DD",
+      "active": true,
+      "specialty": "Coordenação Geral e Servidores do Regimento"
+    },
+    {
+      "id": "tech-cavalcanti",
+      "name": "3º Sgt Cavalcanti",
+      "role": "Chefe da Seção de Informática",
+      "email": "cavalcanti@eb.mil.br",
+      "avatar": "CV",
+      "active": true,
+      "specialty": "Coordenação e Segurança da Informação"
+    },
+    {
+      "id": "tech-castro",
+      "name": "Sd Castro",
+      "role": "Auxiliar da Seção de Informática",
+      "email": "castro@eb.mil.br",
+      "avatar": "CS",
+      "active": true,
+      "specialty": "Controle de Cautelas e Apoio Administrativo"
+    },
+    {
+      "id": "tech-arantes",
+      "name": "Sd Arantes",
+      "role": "Xerife do Corpo Técnico",
+      "email": "arantes@eb.mil.br",
+      "avatar": "AR",
+      "active": true,
+      "specialty": "Triagem e Gerenciamento de Fila de Chamados"
+    },
+    {
+      "id": "tech-machado",
+      "name": "Sd Machado",
+      "role": "Técnico de Manutenção N1",
+      "email": "machado@eb.mil.br",
+      "avatar": "MC",
+      "active": true,
+      "specialty": "Manutenção de Microcomputadores e Impressoras"
+    },
+    {
+      "id": "tech-oliveira",
+      "name": "Sd Oliveira",
+      "role": "Técnico de Redes N1",
+      "email": "oliveira@eb.mil.br",
+      "avatar": "OL",
+      "active": true,
+      "specialty": "Infraestrutura de Rede e Conexão de Dados"
+    },
+    {
+      "id": "tech-vecchiato",
+      "name": "Sd Vecchiato",
+      "role": "Técnico de Sistemas N1",
+      "email": "vecchiato@eb.mil.br",
+      "avatar": "VC",
+      "active": true,
+      "specialty": "Sistemas Militares e Suporte ao Usuário"
+    }
+  ],
+  "tickets": [],
+  "notebook_loans": [],
+  "missions": [],
+  "system_audit_logs": [],
+  "attendance_records": [],
+  "intranet_links": [
+    {
+      "id": "link-1",
+      "title": "Intranet 2º GAC (Regimento Deodoro)",
+      "url": "http://intranet.2gac.eb.mil.br",
+      "category": "Regimento",
+      "description": "Portal principal da Intranet do 2º Grupo de Artilharia de Campanha - Itu/SP."
+    },
+    {
+      "id": "link-2",
+      "title": "SPED / SIGA-EB",
+      "url": "https://sped.eb.mil.br",
+      "category": "Documentos",
+      "description": "Sistema de Protocolo Eletrônico e tramitação de documentos do Exército."
+    },
+    {
+      "id": "link-3",
+      "title": "SGEx - Secretaria-Geral do Exército",
+      "url": "http://www.sgex.eb.mil.br",
+      "category": "Normas & Legislação",
+      "description": "Boletins do Exército (BE), ostensivos e publicações oficiais."
+    },
+    {
+      "id": "link-4",
+      "title": "Webmail Institucional EB",
+      "url": "https://webmail.eb.mil.br",
+      "category": "Comunicação",
+      "description": "Acesso ao correio eletrônico corporativo @eb.mil.br."
+    },
+    {
+      "id": "link-5",
+      "title": "SisCoFi / SIAFI",
+      "url": "https://siscofi.eb.mil.br",
+      "category": "Finanças & Fiscalização",
+      "description": "Sistema de Controle Financeiro e acompanhamento de créditos."
+    },
+    {
+      "id": "link-6",
+      "title": "Portal CTI / Suporte Local 2º GAC",
+      "url": "http://10.24.0.10/suporte",
+      "category": "Seção de TI",
+      "description": "Servidor local da Seção de Informática e Telemática do Regimento."
+    },
+    {
+      "id": "link-7",
+      "title": "DCT - Depto de Ciência e Tecnologia",
+      "url": "http://www.dct.eb.mil.br",
+      "category": "Comunicações",
+      "description": "Diretrizes de segurança da informação e telemática militar."
+    }
+  ]
+}
