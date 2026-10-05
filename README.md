@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
 </p>
 
-<h1 align="center">🛠️ 2º GAC L — HelpDesk & Cautela de Notebooks</h1>
+<h1 align="center">🛠️ 2º GAC — HelpDesk & Cautela de Notebooks</h1>
 
 <p align="center">
   <b>Sistema Integrado de Gestão de Chamados de TI e Controle de Cautelas de Equipamentos.</b>
@@ -26,7 +26,7 @@
 
 ## 📌 Sobre o Projeto
 
-O **2º GAC L - HelpDesk & Cautela de Notebooks** é uma solução web desenvolvida para otimizar e centralizar os atendimentos da **Seção de Informática**. O sistema une o gerenciamento completo de tickets de suporte técnico com um módulo dedicado para cautelas e empréstimos de notebooks e periféricos.
+O **2º GAC - HelpDesk & Cautela de Notebooks** é uma solução web desenvolvida para otimizar e centralizar os atendimentos da **Seção de Informática**. O sistema une o gerenciamento completo de tickets de suporte técnico com um módulo dedicado para cautelas e empréstimos de notebooks e periféricos.
 
 Totalmente containerizado via **Docker**, a aplicação garante fácil implantação, portabilidade e execução padronizada na rede local do Regimento.
 
