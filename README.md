@@ -15,7 +15,6 @@
 
 <p align="center">
   <a href="#-sobre-o-projeto">Sobre</a> •
-  <a href="github.com/GuilhermeManfrinato">Autor</a>
 </p>
 
 ---
