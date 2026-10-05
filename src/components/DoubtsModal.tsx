@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, 
   X, 
@@ -42,7 +42,9 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filtrar chamados que possuem dúvidas/mensagens de solicitantes
+  const [doubtTab, setDoubtTab] = useState<'all' | 'unread' | 'answered'>('all');
+
+  // Filtrar chamados que possuem dúvidas/mensagens de solicitantes ou interações
   const ticketsWithDoubts = tickets.filter(t => {
     const hasUnread = t.messages?.some(m => m.sender === 'solicitante' && !m.readByTi);
     const hasAnySolicitanteMsg = t.messages?.some(m => m.sender === 'solicitante');
@@ -61,16 +63,28 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
     return acc + (t.messages?.filter(m => m.sender === 'solicitante' && !m.readByTi).length || 0);
   }, 0);
 
+  const totalAnswered = sortedTickets.filter(t => {
+    const hasUnread = t.messages?.some(m => m.sender === 'solicitante' && !m.readByTi);
+    return !hasUnread;
+  }).length;
+
+  const displayedTickets = sortedTickets.filter(t => {
+    const hasUnread = t.messages?.some(m => m.sender === 'solicitante' && !m.readByTi);
+    if (doubtTab === 'unread') return hasUnread;
+    if (doubtTab === 'answered') return !hasUnread;
+    return true;
+  });
+
   return (
     <div 
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200 cursor-pointer"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs transition-opacity duration-300 ease-out animate-in fade-in cursor-pointer"
     >
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-white rounded-3xl border-2 border-[#27431e] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden text-slate-900 cursor-default"
+        className="w-full max-w-2xl bg-white rounded-3xl border-2 border-[#27431e] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-slate-900 cursor-default transform transition-all duration-300 ease-out animate-in fade-in zoom-in-95 slide-in-from-bottom-3"
         role="dialog"
         aria-modal="true"
       >
@@ -106,18 +120,53 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
           </button>
         </div>
 
-        {/* Barra de Ações Rápidas */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <span className="text-xs text-slate-600 font-medium">
-            Exibindo <strong>{sortedTickets.length}</strong> chamado(s) com perguntas ou interações de militares das seções:
-          </span>
+        {/* Abas e Barra de Filtros */}
+        <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
+          {/* Alternador de Abas */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setDoubtTab('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                doubtTab === 'all'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Todas ({sortedTickets.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDoubtTab('unread')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                doubtTab === 'unread'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>Pendentes</span>
+              <span className="text-[10px] font-mono px-1 rounded bg-black/20">{totalUnread}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDoubtTab('answered')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                doubtTab === 'answered'
+                  ? 'bg-[#27431e] text-[#dfb642] shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>Respondidas</span>
+              <span className="text-[10px] font-mono px-1 rounded bg-black/20">{totalAnswered}</span>
+            </button>
+          </div>
 
           <button
             onClick={() => {
               onFilterByDoubts();
               onClose();
             }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
               isFilterActive
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'bg-[#1e3316] text-[#dfb642] hover:bg-[#27431e] border border-[#cba135]/40 shadow-xs'
@@ -125,29 +174,34 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
             title="Filtrar os cartões da fila principal do ITDashboard"
           >
             <Filter className="w-3.5 h-3.5" />
-            <span>{isFilterActive ? 'Remover Filtro da Fila' : 'Filtrar Fila Principal'}</span>
+            <span>{isFilterActive ? 'Remover Filtro' : 'Filtrar na Fila'}</span>
           </button>
         </div>
 
-        {/* Lista de Chamados com Dúvidas */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-3">
-          {sortedTickets.length === 0 ? (
+        {/* Lista de Chamados com Dúvidas com Scroll Suave e Explícito */}
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[60vh] flex-1 space-y-3 scroll-smooth">
+          {displayedTickets.length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h4 className="font-bold text-base text-slate-900">Nenhuma dúvida pendente!</h4>
+              <h4 className="font-bold text-base text-slate-900">
+                {doubtTab === 'unread' ? 'Nenhuma dúvida pendente de resposta!' : doubtTab === 'answered' ? 'Nenhuma dúvida respondida nesta categoria.' : 'Nenhuma dúvida registrada!'}
+              </h4>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Todos os solicitantes foram atendidos e não há mensagens novas sem resposta no momento.
+                {doubtTab === 'unread' ? 'Todos os militares solicitantes foram atendidos.' : 'As perguntas e respostas dos militares serão exibidas aqui.'}
               </p>
             </div>
           ) : (
-            sortedTickets.map(t => {
+            displayedTickets.map(t => {
               const dept = departments.find(d => d.id === t.departmentId);
               const unreadCount = t.messages?.filter(m => m.sender === 'solicitante' && !m.readByTi).length || 0;
               const lastSolicitanteMsg = [...(t.messages || [])]
                 .reverse()
                 .find(m => m.sender === 'solicitante');
+              const lastTiMsg = [...(t.messages || [])]
+                .reverse()
+                .find(m => m.sender === 'ti');
 
               return (
                 <div
@@ -182,8 +236,8 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
                           {unreadCount} nova{unreadCount > 1 ? 's' : ''} mensagem{unreadCount > 1 ? 's' : ''}
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 font-mono">
-                          Respondido
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 font-mono">
+                          ✓ Respondido
                         </span>
                       )}
 
@@ -202,13 +256,26 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
                   </h4>
 
                   {lastSolicitanteMsg && (
-                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 text-xs text-slate-700 flex items-start gap-2 mt-2">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2 mt-2">
                       <MessageSquare className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                       <div className="min-w-0 flex-1">
                         <span className="font-bold text-slate-900 mr-1.5">{lastSolicitanteMsg.senderName}:</span>
                         <span className="italic text-slate-600">"{lastSolicitanteMsg.content}"</span>
                         <div className="text-[10px] text-slate-400 mt-1 font-mono">
                           {new Date(lastSolicitanteMsg.createdAt).toLocaleString('pt-BR')}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {lastTiMsg && (
+                    <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2 mt-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-emerald-900 mr-1.5">Última Resposta da TI ({lastTiMsg.senderName}):</span>
+                        <span className="text-emerald-800 font-medium">"{lastTiMsg.content}"</span>
+                        <div className="text-[10px] text-emerald-600 mt-1 font-mono">
+                          {new Date(lastTiMsg.createdAt).toLocaleString('pt-BR')}
                         </div>
                       </div>
                     </div>

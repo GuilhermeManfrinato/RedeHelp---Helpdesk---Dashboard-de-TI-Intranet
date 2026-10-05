@@ -72,15 +72,55 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
   onAddAuditLog,
 }) => {
   // Permissões Oficiais
-  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || currentUser?.username === 'dev';
+  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev';
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || isDev;
   const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
   const isXerife = currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO';
-  const canManageMissions = isChefe || isXerife; // Somente Chefe e Xerife criam e editam
-  const canDeleteMissions = isChefe; // Apenas o Chefe de Seção exclui, padrão do sistema militar
-  const canTakeAttendance = isChefe || isAux || isXerife; // Xerifes, Auxiliares e Chefes de Seção
-  const canSetPriority = isChefe || isAux || isXerife; // Xerife, Chefe e Aux definem prioridade
+  const canManageMissions = isChefe || isXerife || isDev; // Somente Chefe, Xerife e DEV criam e editam
+  const canDeleteMissions = isChefe || isDev; // Chefe de Seção e DEV excluem
+  const canTakeAttendance = isChefe || isAux || isXerife || isDev; // Xerifes, Auxiliares, Chefes e DEV
+  const canSetPriority = isChefe || isAux || isXerife || isDev; // Xerife, Chefe, Aux e DEV definem prioridade
   const isTV = currentUser?.role === 'CH-TVINFO';
   const canInteract = !isTV;
+
+  // Hierarquia Militar: Xerife não inclui Chefe/Aux, Aux não inclui Chefe, Ninguém inclui DEV
+  const isTechAssignable = (tech: Technician) => {
+    const milUser = (militaryUsers || []).find(u => 
+      u.id === tech.id || 
+      u.username === tech.id || 
+      u.name.toLowerCase().trim() === tech.name.toLowerCase().trim() ||
+      (tech.email && u.email && u.email.toLowerCase() === tech.email.toLowerCase())
+    );
+
+    const targetRole = milUser?.role || tech.role;
+    const targetUsername = milUser?.username;
+
+    // NINGUÉM pode incluir o DEV
+    if (targetUsername === 'dev' || targetRole === 'dev' || targetRole === 'DEV' || milUser?.rank === 'Dev') {
+      return false;
+    }
+
+    // Se o operador for XERIFE: não pode incluir Auxiliar nem Chefe
+    if (isXerife && !isChefe && !isDev) {
+      if (
+        targetRole === 'CH-SECINFO' || 
+        targetRole === 'CHSECINFO' || 
+        targetRole === 'AUX-SECINFO' || 
+        targetRole === 'AUXSECINFO'
+      ) {
+        return false;
+      }
+    }
+
+    // Se o operador for AUXILIAR: não pode incluir o Chefe
+    if (isAux && !isChefe && !isDev) {
+      if (targetRole === 'CH-SECINFO' || targetRole === 'CHSECINFO') {
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   const hasActiveTopPriority = missions.some(m => m.isTopPriority && m.status !== 'concluida');
 
@@ -413,17 +453,17 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
         </div>
 
         {/* Botões de Ação do Topo: Tiragem de Faltas e Criação de Missão */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto shrink-0">
           {/* Botão de Tiragem de Faltas (Formatura do Dia - Restrito a Xerife, Aux e Chefe) */}
           {canTakeAttendance && (
             <button
               type="button"
               onClick={() => setIsAttendanceModalOpen(true)}
-              className="px-4 py-3 rounded-2xl bg-[#27431e] hover:bg-[#325727] text-[#dfb642] hover:text-white font-black text-xs flex items-center justify-center gap-2 transition-all shadow-md border border-[#cba135]/60 shrink-0 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-[#27431e] hover:bg-[#325727] text-[#dfb642] hover:text-white font-black text-xs flex items-center justify-center gap-2 transition-all shadow-sm border border-[#cba135]/60 shrink-0 cursor-pointer active:scale-95"
               title="Realizar chamada/tiragem de faltas e consultar histórico militar"
             >
-              <ClipboardCheck className="w-4 h-4 text-[#dfb642]" />
-              <span>📋 Tiragem de Faltas (Formatura)</span>
+              <ClipboardCheck className="w-4 h-4 text-[#dfb642] shrink-0" />
+              <span>Tiragem de Faltas (Formatura)</span>
             </button>
           )}
 
@@ -431,10 +471,11 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
             <button
               type="button"
               onClick={openCreateModal}
-              className="px-5 py-3 rounded-2xl bg-[#1e3316] hover:bg-[#27431e] text-[#dfb642] hover:text-white font-black text-sm flex items-center justify-center gap-2 transition-all shadow-md border border-[#cba135]/60 shrink-0 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-[#1e3316] hover:bg-[#27431e] text-[#dfb642] hover:text-white font-black text-xs flex items-center justify-center gap-2 transition-all shadow-sm border border-[#cba135]/60 shrink-0 cursor-pointer active:scale-95"
+              title="Cadastrar nova missão ou ordem de operação"
             >
-              <Plus className="w-5 h-5" />
-              <span>+ Nova Missão</span>
+              <Plus className="w-4 h-4 text-[#dfb642] shrink-0" />
+              <span>Nova Missão</span>
             </button>
           )}
         </div>
@@ -627,7 +668,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
       </div>
 
       {/* Renderização das Missões (Modo Kanban por Áreas vs Modo Lista) */}
-      {filteredMissions.length === 0 ? (
+      {filteredMissions.length === 0 && viewMode === 'table' ? (
         <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 space-y-3 shadow-xs">
           <Target className="w-12 h-12 text-slate-300 mx-auto" />
           <h3 className="text-base font-bold text-slate-800">
@@ -734,6 +775,62 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
                           const progressPct = totalChecklist > 0 ? Math.round((completedChecklist / totalChecklist) * 100) : 0;
                           const isThisTopPriority = Boolean(mission.isTopPriority && mission.status !== 'concluida');
                           const isCompleted = mission.status === 'concluida';
+
+                          if (isCompleted) {
+                            return (
+                              <div
+                                key={mission.id}
+                                draggable={canInteract}
+                                onDragStart={(e) => {
+                                  if (!canInteract) return;
+                                  e.dataTransfer.setData('text/plain', mission.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  setDraggedMissionId(mission.id);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedMissionId(null);
+                                  setDragOverArea(null);
+                                }}
+                                onClick={() => setSelectedMission(mission)}
+                                className="p-2.5 rounded-xl border border-slate-300 bg-[repeating-linear-gradient(45deg,#f8fafc,#f8fafc_8px,#f1f5f9_8px,#f1f5f9_16px)] hover:bg-slate-100 transition-all flex items-center justify-between gap-2 cursor-pointer shadow-2xs hover:border-slate-400 group opacity-90 hover:opacity-100"
+                                title={`${mission.code} - ${mission.title} (Clique para ver detalhes)`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span className="font-mono text-xs font-black text-[#1e3316] bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 shrink-0">
+                                    {mission.code}
+                                  </span>
+                                  <span className="text-xs text-slate-600 truncate font-semibold group-hover:text-slate-900">
+                                    {mission.title}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  {canInteract && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onUpdateMission(mission.id, { status: 'em_andamento' });
+                                      }}
+                                      className="px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                      title="Reabrir esta missão para Em Andamento"
+                                    >
+                                      <span>🔄 Reabrir</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => setSelectedMission(mission)}
+                                    className="p-1 rounded-md text-slate-400 hover:text-slate-700"
+                                    title="Ver detalhes"
+                                  >
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
 
                           return (
                             <div
@@ -1334,7 +1431,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
                   <span className="text-[11px] text-slate-400 font-normal">Selecione os responsáveis</span>
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-2 border border-slate-200 rounded-xl bg-slate-50">
-                  {technicians.filter(t => t.active).map((tech) => {
+                  {technicians.filter(t => t.active && isTechAssignable(t)).map((tech) => {
                     const isSelected = formAssignedTechs.includes(tech.id);
                     return (
                       <label 

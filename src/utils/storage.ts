@@ -7,7 +7,10 @@ import {
   NotebookLoan, 
   MilitaryUser, 
   SystemAuditLog,
-  Mission
+  Mission,
+  AttendanceRecord,
+  DutyShiftEntry,
+  DutySwapRequest
 } from '../types';
 import { 
   initialTickets, 
@@ -21,7 +24,7 @@ import {
 } from '../data/mockData';
 import { api } from './api';
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   TICKETS: 'eb_tickets_v6',
   DEPARTMENTS: 'eb_departments_v4',
   TECHNICIANS: 'eb_technicians_v5',
@@ -33,6 +36,9 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'eb_current_user_v5',
   MISSIONS: 'eb_missions_v6',
   LAST_PAGE: 'eb_deodoro_last_page_v1',
+  ATTENDANCE_RECORDS: 'eb_attendance_records_v1',
+  DUTY_ROSTER_SHIFTS: 'eb_duty_roster_shifts_v1',
+  DUTY_SWAPS: 'eb_duty_swaps_v1',
 };
 
 // Sincronização inicial com o banco Sequelize em background
@@ -110,6 +116,7 @@ export const loadTickets = (): Ticket[] => {
 export const saveTickets = (tickets: Ticket[]) => {
   try {
     localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+    broadcastSyncEvent('TICKETS_CHANGED', tickets);
   } catch (e) {
     console.error('Erro ao salvar tickets:', e);
   }
@@ -201,6 +208,7 @@ export const loadNotebookLoans = (): NotebookLoan[] => {
 export const saveNotebookLoans = (loans: NotebookLoan[]) => {
   try {
     localStorage.setItem(STORAGE_KEYS.NOTEBOOK_LOANS, JSON.stringify(loans));
+    broadcastSyncEvent('NOTEBOOK_LOANS_CHANGED', loans);
   } catch (e) {
     console.error('Erro ao salvar cautelas de notebook:', e);
   }
@@ -323,7 +331,8 @@ export const loadMissions = (): Mission[] => {
 export const saveMissions = (missions: Mission[]) => {
   try {
     localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(missions));
-    broadcastSyncEvent('MISSIONS_UPDATED');
+    broadcastSyncEvent('MISSIONS_CHANGED', missions);
+    broadcastSyncEvent('MISSIONS_UPDATED', missions);
   } catch (e) {
     console.error('Erro ao salvar missões:', e);
   }
@@ -416,5 +425,86 @@ export const onRealtimeSync = (callback: (data: { type: string; payload?: any })
     window.removeEventListener('storage', handleStorage);
     window.removeEventListener('eb_sync_event', handleCustom);
   };
+};
+
+// ==================== TIRAGEM DE FALTAS / EFETIVO ====================
+export const loadAttendanceRecords = (): AttendanceRecord[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.ATTENDANCE_RECORDS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveAttendanceRecords = (records: AttendanceRecord[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ATTENDANCE_RECORDS, JSON.stringify(records));
+    broadcastSyncEvent('ATTENDANCE_CHANGED', records.length);
+  } catch (e) {
+    console.error('Erro ao salvar registros de faltas:', e);
+  }
+};
+
+// ==================== ESCALA DE SERVIÇO (1x7 EM DUPLA) ====================
+export const loadDutyRosterShifts = (): DutyShiftEntry[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DUTY_ROSTER_SHIFTS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveDutyRosterShifts = (shifts: DutyShiftEntry[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DUTY_ROSTER_SHIFTS, JSON.stringify(shifts));
+    broadcastSyncEvent('DUTY_ROSTER_CHANGED', shifts.length);
+  } catch (e) {
+    console.error('Erro ao salvar escala de serviço:', e);
+  }
+};
+
+export const loadDutySwaps = (): DutySwapRequest[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DUTY_SWAPS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveDutySwaps = (swaps: DutySwapRequest[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DUTY_SWAPS, JSON.stringify(swaps));
+    broadcastSyncEvent('DUTY_SWAPS_CHANGED', swaps.length);
+  } catch (e) {
+    console.error('Erro ao salvar trocas de escala:', e);
+  }
+};
+
+// ==================== ACESSIBILIDADE INDIVIDUAL POR USUÁRIO ====================
+export const saveUserAccessibilitySettings = (username: string, settings: AccessibilitySettings) => {
+  if (!username) return;
+  try {
+    localStorage.setItem(`eb_user_a11y_${username.toLowerCase()}`, JSON.stringify(settings));
+  } catch (e) {
+    console.error('Erro ao salvar acessibilidade do usuário:', e);
+  }
+};
+
+export const loadUserAccessibilitySettings = (username: string): AccessibilitySettings | null => {
+  if (!username) return null;
+  try {
+    const raw = localStorage.getItem(`eb_user_a11y_${username.toLowerCase()}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
 };
 

@@ -73,7 +73,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const [isManualExpanded, setIsManualExpanded] = useState<boolean>(false);
   const [showTvModal, setShowTvModal] = useState<boolean>(false);
 
-  const isSecInfo = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' || currentUser?.role === 'CHSECINFO' || currentUser?.username === 'dev';
+  const isChefeOrDev = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || currentUser?.role === 'dev' || currentUser?.username === 'dev';
   const isTech = currentUser?.role === 'CH-TECNICOINFO' || currentUser?.role === 'TECINFO';
   const isTvAllowed = currentUser?.role === 'CH-TVINFO' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
 
@@ -136,7 +136,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         onMouseLeave={() => {
           setIsHovered(false);
         }}
-        className={`shrink-0 transition-[width] duration-200 ease-out border-r shadow-2xl flex flex-col ${
+        className={`shrink-0 transition-[width] duration-200 ease-out border-r shadow-2xl flex flex-col justify-between ${
           isExpanded ? 'w-72' : 'w-20'
         } ${
           a11y.highContrast
@@ -145,10 +145,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         } ${
           isMobileOpen 
             ? 'fixed inset-y-0 left-0 z-50 h-full translate-x-0' 
-            : 'fixed inset-y-0 left-0 z-50 h-full -translate-x-full lg:translate-x-0 lg:static lg:self-stretch lg:min-h-full'
+            : 'fixed inset-y-0 left-0 z-50 h-full -translate-x-full lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:max-h-screen'
         }`}
       >
-        <div className="lg:sticky lg:top-0 h-screen max-h-screen flex flex-col justify-between w-full overflow-hidden">
+        <div className="flex flex-col justify-between h-full w-full overflow-hidden">
         
         {/* Cabeçalho da Sidebar: Brasão Militar & Identidade 2º GAC */}
         <div className={`p-4 border-b border-[#2d4a22] bg-[#1a2c15] transition-all flex items-center justify-between ${
@@ -295,8 +295,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 ) : null}
               </button>
 
-              {/* Item 2: Cautela de Notebooks (Exclusivo CH-SECINFO) */}
-              {isSecInfo && (
+              {/* Item 2: Cautela de Notebooks (Exclusivo Chefe de Seção e DEV) */}
+              {isChefeOrDev && (
                 <button
                   onClick={() => {
                     onSelectAdminTab('notebooks');
@@ -381,8 +381,42 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 )}
               </button>
 
-              {/* Item 4: Militares & Auditoria (Exclusivo CH-SECINFO) */}
-              {isSecInfo && (
+              {/* Item: Escala de Serviço (Informático de Dia em Dupla 1x7) */}
+              <button
+                onClick={() => {
+                  onSelectAdminTab('duty_roster');
+                  onCloseMobile();
+                }}
+                title="Escala de Serviço (Informático de Dia em Dupla 1x7)"
+                className={`w-full rounded-2xl text-left text-xs font-bold transition-all flex items-center group ${
+                  isExpanded ? 'px-3.5 py-3 justify-between' : 'p-3 justify-center'
+                } ${
+                  adminTab === 'duty_roster'
+                    ? a11y.highContrast
+                      ? 'bg-yellow-400 text-black font-black shadow-md'
+                      : 'bg-[#dfb642] text-[#192b14] font-black shadow-lg scale-[1.01]'
+                    : 'text-slate-200 hover:bg-[#1e3316] hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`p-2 rounded-xl shrink-0 ${
+                    adminTab === 'duty_roster' ? 'bg-[#192b14] text-[#dfb642]' : 'bg-[#1e3316] text-emerald-300 group-hover:bg-[#27431e]'
+                  }`}>
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  {isExpanded && (
+                    <div className="min-w-0 truncate">
+                      <span className="block text-sm truncate">Escala de Serviço</span>
+                      <span className={`text-[10px] font-normal block truncate ${adminTab === 'duty_roster' ? 'text-[#192b14]/80' : 'text-slate-400'}`}>
+                        Informático de Dia (1x7)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              {/* Item 4: Militares & Auditoria (Exclusivo Chefe de Seção e DEV) */}
+              {isChefeOrDev && (
                 <button
                   onClick={() => {
                     onSelectAdminTab('technicians');

@@ -9,13 +9,18 @@ import {
   Users,
   Clock,
   ShieldAlert,
+  ShieldCheck,
   Shield,
   UserCheck,
   Target,
   ZoomIn,
   ZoomOut,
   Eye,
-  Bell
+  Bell,
+  Sliders,
+  RotateCcw,
+  Calendar,
+  X
 } from 'lucide-react';
 import { AccessibilitySettings, MilitaryUser, AdminTab, Ticket, Department } from '../types';
 import { RegimentoDeodoroLogo } from './RegimentoDeodoroLogo';
@@ -55,14 +60,21 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
   a11y,
   onUpdateA11y,
 }) => {
+  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev';
+  const [clockOffsetMs, setClockOffsetMs] = useState<number>(() => {
+    const saved = localStorage.getItem('redehelp_dev_clock_offset');
+    return saved ? parseInt(saved, 10) || 0 : 0;
+  });
   const [timeStr, setTimeStr] = useState<string>('');
   const [nowDate, setNowDate] = useState<Date>(new Date());
   const [showDoubtsModal, setShowDoubtsModal] = useState<boolean>(false);
   const [showExpedienteAlert, setShowExpedienteAlert] = useState<boolean>(false);
+  const [showDevClockModal, setShowDevClockModal] = useState<boolean>(false);
+  const [devCustomTimeInput, setDevCustomTimeInput] = useState<string>('');
 
   useEffect(() => {
     const update = () => {
-      const now = new Date();
+      const now = new Date(Date.now() + clockOffsetMs);
       setNowDate(now);
       setTimeStr(now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
 
@@ -77,13 +89,19 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
       }
     };
     update();
-    const interval = setInterval(update, 10000);
+    const interval = setInterval(update, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [clockOffsetMs]);
 
   const currentHour = nowDate.getHours();
-  const isOffHours = currentHour < 8; // Fora de expediente (antes das 08h)
-  const isLunch = currentHour >= 12 && currentHour < 13; // Almoço (12h às 13h)
+  // Regra Militar: antes das 08:00 e a partir das 16:00 é fora de expediente / ausente (dormindo 💤)
+  const isOffHours = currentHour < 8 || currentHour >= 16;
+  // Intervalo de almoço: 12:00 às 13:00 (prato de comida 🍽️)
+  const isLunch = !isOffHours && currentHour === 12;
+
+  const dayName = nowDate.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const formattedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+  const dateFormatted = nowDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const getTabTitle = () => {
     switch (adminTab) {
@@ -110,6 +128,12 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
           title: 'Gestão de Militares & Auditoria',
           subtitle: 'Cadastro de login/senha individual e logs detalhados',
           icon: <Users className="w-5 h-5 text-[#27431e]" />
+        };
+      case 'duty_roster':
+        return {
+          title: 'Escala de Serviço & Livro de Parte',
+          subtitle: 'Informático de Dia em dupla (1x7), rondas e passagem de serviço',
+          icon: <ShieldCheck className="w-5 h-5 text-[#27431e]" />
         };
     }
   };
@@ -251,41 +275,66 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
           </div>
         )}
 
-        {/* Relógio Digital & Indicador de Expediente Militar */}
-        <div 
-          className={`hidden lg:flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1.5 rounded-xl border transition-all ${
-            isOffHours 
-              ? 'bg-indigo-950 text-indigo-200 border-indigo-700' 
-              : isLunch 
-                ? 'bg-amber-100 text-amber-950 border-amber-300' 
-                : 'bg-slate-100 text-slate-700 border-slate-200'
-          }`}
-          title={
-            isOffHours 
-              ? 'Fora de Expediente Militar (Antes das 08:00) - Modo Ausente' 
-              : isLunch 
-                ? 'Horário de Almoço (12:00 às 13:00) - Intervalo da Seção' 
-                : 'Expediente Militar Ativo'
-          }
-        >
-          {isOffHours ? (
-            <span className="text-sm" role="img" aria-label="dormindo">💤</span>
-          ) : isLunch ? (
-            <span className="text-sm" role="img" aria-label="almoco">🍽️</span>
-          ) : (
-            <Clock className="w-3.5 h-3.5 text-[#27431e]" />
-          )}
-          <span>{timeStr}</span>
-          {isOffHours && (
-            <span className="text-[10px] bg-indigo-900 text-indigo-200 px-1.5 py-0.2 rounded font-sans font-bold">
-              Ausente
-            </span>
-          )}
-          {isLunch && (
-            <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-sans font-bold">
-              Almoço
-            </span>
-          )}
+        {/* Relógio Digital & Indicador de Expediente Militar com Data e Dia da Semana ALINHADOS */}
+        <div className="hidden lg:flex items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-xs">
+            <Calendar className="w-3.5 h-3.5 text-[#27431e]" />
+            <span>{formattedDay}, {dateFormatted}</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <div 
+              className={`flex items-center gap-1.5 text-xs font-mono font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
+                isOffHours 
+                  ? 'bg-indigo-950 text-indigo-200 border-indigo-700' 
+                  : isLunch 
+                    ? 'bg-amber-100 text-amber-950 border-amber-300' 
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+              title={
+                isOffHours 
+                  ? 'Fora de Expediente Militar (Antes das 08:00 ou após as 16:00) - Modo Ausente' 
+                  : isLunch 
+                    ? 'Horário de Almoço (12:00 às 13:00) - Intervalo da Seção' 
+                    : 'Expediente Militar Ativo'
+              }
+            >
+              {isOffHours ? (
+                <span className="text-sm" role="img" aria-label="dormindo">💤</span>
+              ) : isLunch ? (
+                <span className="text-sm" role="img" aria-label="almoco">🍽️</span>
+              ) : (
+                <Clock className="w-3.5 h-3.5 text-[#27431e]" />
+              )}
+              <span>{timeStr}</span>
+              {isOffHours && (
+                <span className="text-[10px] bg-indigo-900 text-indigo-200 px-1.5 py-0.2 rounded font-sans font-bold">
+                  Ausente
+                </span>
+              )}
+              {isLunch && (
+                <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-sans font-bold">
+                  Almoço
+                </span>
+              )}
+              {clockOffsetMs !== 0 && (
+                <span className="text-[9px] bg-purple-200 text-purple-900 px-1 rounded font-mono font-black" title="Horário Simulado pelo Desenvolvedor">
+                  SIM
+                </span>
+              )}
+            </div>
+
+            {/* Simulador manual exclusivo do DEV */}
+            {isDev && (
+              <button
+                type="button"
+                onClick={() => setShowDevClockModal(true)}
+                className="p-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-[#1e3316] transition-colors cursor-pointer"
+                title="Módulo de Simulação de Relógio (Exclusivo DEV)"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Sair */}
@@ -337,6 +386,7 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
         tickets={tickets}
         departments={departments}
         onOpenTicket={(ticket) => {
+          setShowDoubtsModal(false);
           if (onOpenTicketWithDoubts) {
             onOpenTicketWithDoubts(ticket);
           }
@@ -348,6 +398,132 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
         }}
         isFilterActive={isFilterDoubtsActive}
       />
+
+      {/* MODAL SIMULADOR DE HORÁRIO DO SISTEMA (EXCLUSIVO DEV) */}
+      {showDevClockModal && (
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setShowDevClockModal(false); }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border-2 border-[#27431e]/50 cursor-default"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-[#1e3316] text-[#dfb642]">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Simulador de Relógio do Sistema</h3>
+                  <span className="text-xs text-amber-700 font-mono font-bold">Painel de Testes Exclusivo do Desenvolvedor</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowDevClockModal(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <p className="text-slate-600">
+                Altere manualmente o relógio do sistema para validar as regras de <strong>ausente (&lt;08h e &ge;16h)</strong>, <strong>almoço (12h-13h)</strong> e <strong>alerta de fim de expediente (15:30)</strong>.
+              </p>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between font-mono">
+                <span className="text-slate-500">Horário simulado atual:</span>
+                <span className="text-sm font-bold text-[#1e3316]">{timeStr} ({formattedDay})</span>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">
+                  Cenários Rápidos de Teste:
+                </label>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {[
+                    { label: '07:30 · Fora de Expediente (Modo Ausente / Dormindo)', time: '07:30' },
+                    { label: '10:00 · Expediente Normal da TI (Ativo)', time: '10:00' },
+                    { label: '12:30 · Horário de Almoço (Ícone Comida)', time: '12:30' },
+                    { label: '15:35 · 15min Fim de Expediente (Pop-up Alerta)', time: '15:35' },
+                    { label: '17:00 · Após 16h (Modo Ausente / Dormindo)', time: '17:00' },
+                  ].map((scenario) => (
+                    <button
+                      key={scenario.time}
+                      type="button"
+                      onClick={() => {
+                        const [h, m] = scenario.time.split(':').map(Number);
+                        const target = new Date();
+                        target.setHours(h, m, 0, 0);
+                        const offset = target.getTime() - Date.now();
+                        setClockOffsetMs(offset);
+                        localStorage.setItem('redehelp_dev_clock_offset', String(offset));
+                      }}
+                      className="text-left px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#1e3316] font-bold border border-emerald-200 transition-colors flex items-center justify-between cursor-pointer"
+                    >
+                      <span>{scenario.label}</span>
+                      <span className="font-mono text-xs">{scenario.time}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200">
+                <label className="block font-bold text-slate-700 uppercase mb-1">
+                  Definir Horário Personalizado (HH:MM):
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="time"
+                    value={devCustomTimeInput}
+                    onChange={(e) => setDevCustomTimeInput(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-300 font-mono text-sm font-bold bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!devCustomTimeInput) return;
+                      const [h, m] = devCustomTimeInput.split(':').map(Number);
+                      const target = new Date();
+                      target.setHours(h, m, 0, 0);
+                      const offset = target.getTime() - Date.now();
+                      setClockOffsetMs(offset);
+                      localStorage.setItem('redehelp_dev_clock_offset', String(offset));
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs hover:bg-[#27431e] cursor-pointer"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-between border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setClockOffsetMs(0);
+                    localStorage.removeItem('redehelp_dev_clock_offset');
+                    setShowDevClockModal(false);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold flex items-center gap-1.5 text-xs cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restaurar Hora Real</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDevClockModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </header>
   );

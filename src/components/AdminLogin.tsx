@@ -220,10 +220,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       return;
     }
 
-    // 2. Verificar se o login está bloqueado por excesso de tentativas (3 erros)
+    // 2. Verificar se o login está bloqueado por excesso de tentativas (3 erros) - O login DEV nunca é bloqueado
+    const isDev = matchedUser.username === 'dev' || matchedUser.role === 'dev';
     const userKey = matchedUser.id || matchedUser.username;
     const baseAttempts = Math.max(matchedUser.failedAttempts || 0, localAttempts[userKey] || 0);
-    const isLocked = Boolean(matchedUser.isLocked || baseAttempts >= 3);
+    const isLocked = !isDev && Boolean(matchedUser.isLocked || baseAttempts >= 3);
     if (isLocked) {
       setIsSubmitting(false);
       setErrorMsg('Este login está BLOQUEADO por motivos de segurança (3 tentativas incorretas). Para liberar o acesso, solicite a autorização do Chefe da Seção (CHINFO) ou Auxiliar.');
@@ -234,7 +235,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     if (matchedUser.password === cleanPass) {
       // Senha correta: resetar contador de tentativas erradas se houver
       setLocalAttempts(prev => ({ ...prev, [userKey]: 0 }));
-      if (baseAttempts > 0) {
+      if (baseAttempts > 0 && !isDev) {
         const resetUser: MilitaryUser = {
           ...matchedUser,
           failedAttempts: 0,
@@ -253,7 +254,14 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       return;
     }
 
-    // 4. Senha incorreta: contabilizar erro progressivamente e bloquear ao atingir 3 tentativas
+    // Se for o DEV, não contabiliza infrações nem tranca
+    if (isDev) {
+      setIsSubmitting(false);
+      setErrorMsg('Senha incorreta para as credenciais DEV.');
+      return;
+    }
+
+    // 4. Senha incorreta militar: contabilizar erro progressivamente e bloquear ao atingir 3 tentativas
     const currentAttempts = baseAttempts + 1;
     setLocalAttempts(prev => ({ ...prev, [userKey]: currentAttempts }));
     const lockNow = currentAttempts >= 3;

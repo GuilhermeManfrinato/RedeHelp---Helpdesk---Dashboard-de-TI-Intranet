@@ -25,6 +25,7 @@ import {
   Trash2,
   Copy,
   Check,
+  Edit3,
   GripVertical,
   ChevronDown,
   ChevronRight
@@ -62,6 +63,7 @@ interface NotebookLoansProps {
   ) => void;
   onDeleteLoan?: (loanId: string) => void;
   onUpdateLoan?: (loanId: string, updates: Partial<NotebookLoan>) => void;
+  onAddAuditLog?: (log: any) => void;
 }
 
 const COMMON_ISSUES = [
@@ -87,6 +89,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
   onSendLoanMessage,
   onDeleteLoan,
   onUpdateLoan,
+  onAddAuditLog,
 }) => {
   // Filtros
   const [filterStatus, setFilterStatus] = useState<'all' | 'cautelado' | 'devolvido' | 'atrasado'>('all');
@@ -156,11 +159,77 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
   const [loanChatInput, setLoanChatInput] = useState('');
   const [loanChatSender, setLoanChatSender] = useState<'ti' | 'militar'>('ti');
 
+  // Sincronização em tempo real do modal de chat da cautela
+  useEffect(() => {
+    if (activeLoanForChat) {
+      const fresh = loans.find(l => l.id === activeLoanForChat.id);
+      if (fresh && JSON.stringify(fresh.messages) !== JSON.stringify(activeLoanForChat.messages)) {
+        setActiveLoanForChat(fresh);
+      }
+    }
+  }, [loans, activeLoanForChat]);
+
+  // Modal Edição de Cautela
+  const [editingLoan, setEditingLoan] = useState<NotebookLoan | null>(null);
+  const [editBorrowerName, setEditBorrowerName] = useState('');
+  const [editBorrowerDept, setEditBorrowerDept] = useState('');
+  const [editNotebookNumber, setEditNotebookNumber] = useState('');
+  const [editNotebookName, setEditNotebookName] = useState('');
+  const [editExpectedReturnDate, setEditExpectedReturnDate] = useState('');
+  const [editReturnNotes, setEditReturnNotes] = useState('');
+
+  const handleOpenEditModal = (loan: NotebookLoan) => {
+    setEditingLoan(loan);
+    setEditBorrowerName(loan.borrowerName || '');
+    setEditBorrowerDept(loan.departmentId || departments[0]?.id || '');
+    setEditNotebookNumber(loan.notebookNumber || '');
+    setEditNotebookName(loan.notebookName || '');
+    setEditExpectedReturnDate(loan.expectedReturnDate || '');
+    setEditReturnNotes(loan.returnNotes || '');
+  };
+
+  const handleSaveEditLoan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLoan) return;
+
+    const newHistoryItem: LoanHistoryItem = {
+      id: `lh-${Date.now()}`,
+      date: new Date().toISOString(),
+      author: currentUser?.name || 'Seção de TI',
+      action: 'inspecao',
+      summary: `Dados da cautela alterados: Militar (${editBorrowerName}), Patrimônio (${editNotebookNumber}), Devolução (${editExpectedReturnDate}).`,
+    };
+
+    if (onUpdateLoan) {
+      onUpdateLoan(editingLoan.id, {
+        borrowerName: editBorrowerName.trim(),
+        departmentId: editBorrowerDept,
+        notebookNumber: editNotebookNumber.trim(),
+        notebookName: editNotebookName.trim(),
+        expectedReturnDate: editExpectedReturnDate,
+        returnNotes: editReturnNotes.trim(),
+        history: [...(editingLoan.history || []), newHistoryItem],
+      });
+    }
+
+    onAddAuditLog?.({
+      militaryName: currentUser?.name || 'Seção de TI',
+      militaryLogin: currentUser?.username || 'ti',
+      role: currentUser?.role || 'CH-SECINFO',
+      actionType: 'EDICAO_CAUTELA',
+      summary: `Editou os dados da cautela do notebook ${editNotebookNumber} (${editBorrowerName})`,
+      targetRef: editNotebookNumber,
+    });
+
+    setEditingLoan(null);
+  };
+
   // Fechamento de qualquer modal ao pressionar ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (loanToDelete) setLoanToDelete(null);
+        else if (editingLoan) setEditingLoan(null);
         else if (quickReturnLoan) setQuickReturnLoan(null);
         else if (showNewModal) setShowNewModal(false);
         else if (activeLoanForReturn) setActiveLoanForReturn(null);
@@ -170,10 +239,10 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [loanToDelete, quickReturnLoan, showNewModal, activeLoanForReturn, activeLoanForExtension, activeLoanForChat]);
+  }, [loanToDelete, editingLoan, quickReturnLoan, showNewModal, activeLoanForReturn, activeLoanForExtension, activeLoanForChat]);
 
   // Permissões militares
-  const isChefe = currentUser?.role === 'CH-SECINFO';
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'dev' || currentUser?.username === 'dev';
   const isXerife = currentUser?.role === 'CH-XERIFEINFO';
   const isTV = currentUser?.role === 'CH-TVINFO';
   const canManageLoans = Boolean(isChefe || isXerife); // Somente Chefe e Xerife criam ou autorizam novas cautelas
@@ -498,6 +567,48 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
     const isOverdue = isLoanOverdue(loan);
     const isReturned = loan.status === 'devolvido';
     const isProrrogado = Boolean(loan.extensionCount && loan.extensionCount > 0);
+    if (isReturned) {
+      return (
+        <div
+          key={loan.id}
+          draggable={canInteract}
+          onDragStart={(e) => {
+            e.dataTransfer.setData('text/plain', loan.id);
+            e.dataTransfer.effectAllowed = 'move';
+            setDraggedLoanId(loan.id);
+          }}
+          onDragEnd={() => {
+            setDraggedLoanId(null);
+            setDragOverColumn(null);
+          }}
+          onClick={() => {
+            setActiveLoanForChat(loan);
+            setLoanChatInput('');
+          }}
+          className={`p-2.5 rounded-xl border border-slate-300 text-xs transition-all hover:border-slate-400 cursor-pointer shadow-2xs bg-[repeating-linear-gradient(45deg,#f8fafc,#f8fafc_8px,#f1f5f9_8px,#f1f5f9_16px)] opacity-90 hover:opacity-100 ${
+            draggedLoanId === loan.id ? 'opacity-40 scale-95 border-dashed border-[#27431e]' : ''
+          }`}
+          title="Equipamento Devolvido ao Depósito (Clique para ver histórico e chat)"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black bg-slate-200 text-slate-700 uppercase tracking-wider shrink-0">
+                DEVOLVIDO
+              </span>
+              <span className="font-mono font-bold text-slate-700 text-[11px] shrink-0">
+                {loan.notebookNumber}
+              </span>
+              <span className="text-slate-600 truncate font-medium text-[11px]">
+                {loan.notebookName}
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400 shrink-0 font-mono">
+              {loan.borrowerName}
+            </span>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -545,7 +656,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
             </span>
           </div>
 
-          <div className="shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             {isReturned ? (
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                 Devolvido
@@ -562,6 +673,42 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                 No Prazo
               </span>
+            )}
+
+            {/* Ações de Ícones no Topo (Não quebram o layout do card) */}
+            <button
+              type="button"
+              onClick={() => handleCopyLoan(loan)}
+              className="p-1 rounded text-slate-400 hover:text-emerald-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Copiar dados da cautela"
+            >
+              {copiedLoanId === loan.id ? (
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            {canInteract && (
+              <button
+                type="button"
+                onClick={() => handleOpenEditModal(loan)}
+                className="p-1 rounded text-slate-400 hover:text-[#1e3316] hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Editar dados desta cautela"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {canDeleteLoans && (
+              <button
+                type="button"
+                onClick={() => setLoanToDelete(loan)}
+                className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                title="Excluir Cautela (Exclusivo Chefe da Seção)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         </div>
@@ -602,15 +749,15 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
           )}
         </div>
 
-        {/* Ações Rápidas do Card */}
-        <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100 text-xs">
+        {/* Ações Rápidas do Card (Espaçadas e Responsivas) */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-slate-100 text-xs">
           {/* Botão de Histórico e Chat */}
           <button
             onClick={() => {
               setActiveLoanForChat(loan);
               setLoanChatInput('');
             }}
-            className="flex-1 py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+            className="flex-1 min-w-[70px] py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
             title="Abrir histórico e chat da cautela"
           >
             <MessageSquare className="w-3 h-3 text-emerald-700" />
@@ -628,7 +775,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 setExtensionJustification('');
                 setExtensionError('');
               }}
-              className="py-1.5 px-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 font-bold text-[10px] flex items-center gap-1 border border-amber-300 transition-colors cursor-pointer"
+              className="py-1.5 px-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 font-bold text-[10px] flex items-center gap-1 border border-amber-300 transition-colors cursor-pointer"
               title="Prorrogar prazo de devolução"
             >
               <CalendarPlus className="w-3 h-3 text-amber-700" />
@@ -648,7 +795,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 setReturnPassword('');
                 setReturnAuthError('');
               }}
-              className="py-1.5 px-2 rounded-lg bg-[#27431e] hover:bg-[#1e3316] text-[#dfb642] font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+              className="py-1.5 px-2.5 rounded-lg bg-[#27431e] hover:bg-[#1e3316] text-[#dfb642] font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
               title="Receber devolução do notebook"
             >
               <RotateCcw className="w-3 h-3" />
@@ -658,38 +805,13 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
 
           {/* Se devolvido: laudo de avarias */}
           {isReturned && (
-            <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+            <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1 ml-auto">
               {loan.hasIssuesOnReturn ? (
                 <span className="text-red-600">⚠️ Com avarias</span>
               ) : (
                 <span className="text-emerald-700">✅ Íntegro</span>
               )}
             </div>
-          )}
-
-          {/* Botão Copiar Dados da Cautela */}
-          <button
-            type="button"
-            onClick={() => handleCopyLoan(loan)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            title="Copiar dados da cautela"
-          >
-            {copiedLoanId === loan.id ? (
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
-            ) : (
-              <Copy className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          {/* Se Chefe de Seção: Botão Excluir (Lixeira) */}
-          {canDeleteLoans && (
-            <button
-              onClick={() => setLoanToDelete(loan)}
-              className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer ml-auto"
-              title="Excluir Cautela (Exclusivo Chefe da Seção)"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
           )}
         </div>
       </div>
@@ -942,8 +1064,8 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
         )}
       </div>
 
-      {/* Estado vazio global quando não há nenhuma cautela */}
-      {filteredLoans.length === 0 && (
+      {/* Estado vazio global quando não há nenhuma cautela na visualização em tabela */}
+      {viewMode === 'table' && filteredLoans.length === 0 && (
         <div className="p-12 text-center rounded-3xl bg-white border border-slate-200 text-slate-500 space-y-3 shadow-xs">
           <Laptop className="w-12 h-12 text-slate-300 mx-auto" />
           <h4 className="text-base font-bold text-slate-800">
@@ -2508,6 +2630,145 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 <span>Sim, Excluir Cautela</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE EDIÇÃO DE DADOS DA CAUTELA */}
+      {editingLoan && (
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingLoan(null); }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-5 shadow-2xl border border-[#27431e]/30 cursor-default"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2.5 rounded-2xl bg-[#1e3316] text-[#dfb642]">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 leading-tight">
+                    Editar Dados da Cautela
+                  </h3>
+                  <span className="text-xs text-slate-500 font-mono">
+                    {editingLoan.notebookNumber} · {editingLoan.notebookName}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEditingLoan(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditLoan} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Patrimônio / Número *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editNotebookNumber}
+                    onChange={(e) => setEditNotebookNumber(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold font-mono bg-white focus:ring-2 focus:ring-[#27431e]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Modelo do Equipamento *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editNotebookName}
+                    onChange={(e) => setEditNotebookName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-[#27431e]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Militar Responsável *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editBorrowerName}
+                    onChange={(e) => setEditBorrowerName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-[#27431e]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Seção de Destino *
+                  </label>
+                  <select
+                    value={editBorrowerDept}
+                    onChange={(e) => setEditBorrowerDept(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white focus:ring-2 focus:ring-[#27431e]"
+                  >
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Previsão de Devolução *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editExpectedReturnDate}
+                  onChange={(e) => setEditExpectedReturnDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white focus:ring-2 focus:ring-[#27431e]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Observações da Cautela
+                </label>
+                <textarea
+                  rows={2}
+                  value={editReturnNotes}
+                  onChange={(e) => setEditReturnNotes(e.target.value)}
+                  placeholder="Informações adicionais, carregador, número de série..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white focus:ring-2 focus:ring-[#27431e]"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingLoan(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs hover:bg-[#27431e] shadow-md border border-[#cba135] cursor-pointer"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

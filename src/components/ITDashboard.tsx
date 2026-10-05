@@ -51,6 +51,8 @@ interface ITDashboardProps {
   onSendMessage: (ticketId: string, content: string, sender: 'solicitante' | 'ti', senderName: string) => void;
   onMarkMessagesAsRead: (ticketId: string) => void;
   onMassIntervention?: (message: string) => void;
+  initialActiveTicket?: Ticket | null;
+  onClearInitialTicket?: () => void;
 }
 
 interface DropRequirement {
@@ -75,28 +77,32 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
   onSendMessage,
   onMarkMessagesAsRead,
   onMassIntervention,
+  initialActiveTicket,
+  onClearInitialTicket,
 }) => {
   // Controle de Permissões baseado no Perfil Militar
   const userRole = currentUser?.role || 'CH-SECINFO';
+  const isDev = userRole === 'dev' || userRole === 'DEV' || currentUser?.username === 'dev';
   const isTV = userRole === 'CH-TVINFO';
   const isTecnico = userRole === 'CH-TECNICOINFO' || userRole === 'TECINFO';
   const isXerife = userRole === 'CH-XERIFEINFO' || userRole === 'XERIFESECINFO';
-  const isChefe = userRole === 'CH-SECINFO' || userRole === 'CHSECINFO' || currentUser?.username === 'dev';
+  const isChefe = userRole === 'CH-SECINFO' || userRole === 'CHSECINFO' || isDev;
 
   // Regras estritas solicitadas:
-  // CH-SECINFO: Chefe da Seção - Acesso irrestrito (único que pode excluir chamados definitivamente, editar tudo)
-  // CH-XERIFEINFO: Xerife da TI - Triagem operacional, atribuir técnicos, mudar prioridades, mover cards no Kanban, intervenção em massa, editar dados do card/título. NÃO exclui chamados!
-  // CH-TECNICOINFO: Técnico de Atendimento - Atende chamados, responde dúvidas do solicitante, adiciona notas internas. NÃO move cards no Kanban, NÃO exclui, NÃO altera dados cadastrais/título, NÃO altera prioridade, NÃO faz intervenção em massa.
-  // CH-TVINFO: Painel TV - Exclusivo para visualização ampliada na TV, sem nenhuma permissão de alteração ou interação.
-  const canDelete = isChefe; // Apenas o Chefe da Seção pode excluir chamados
-  const canEditTitle = isChefe || isXerife; // Apenas Chefe e Xerife podem renomear chamados
-  const canEditCard = isChefe || isXerife; // Apenas Chefe e Xerife podem editar dados cadastrais do chamado
-  const canAssignTech = isChefe || isXerife; // Apenas Chefe e Xerife distribuem/atribuem técnicos
-  const canChangePriority = isChefe || isXerife; // Apenas Chefe e Xerife alteram prioridade
-  const canMassIntervene = isXerife; // Intervenção do Xerife: estritamente e exclusivamente para o Xerife!
-  const canMoveStatus = isXerife; // Apenas o Xerife da TI tem acesso especial para mover cards entre colunas no Kanban!
-  const canReplyChat = !isTV; // Chefe, Xerife e Técnicos podem responder ao chat/dúvidas
-  const canAddNotes = !isTV; // Chefe, Xerife e Técnicos podem despachar parecer técnico interno
+  // dev: Superusuário com acesso irrestrito a todas as funções
+  // CH-SECINFO: Chefe da Seção - Acesso irrestrito (exclui chamados, edita tudo, move cards)
+  // CH-XERIFEINFO: Xerife da TI - Triagem operacional, mover cards no Kanban, intervir em massa, editar dados
+  // CH-TECNICOINFO: Técnico de Atendimento - Atende chamados, responde dúvidas, adiciona notas internas
+  // CH-TVINFO: Painel TV - Exclusivo para visualização ampliada na TV, sem nenhuma alteração
+  const canDelete = isChefe || isDev; // Chefe da Seção e DEV excluem chamados
+  const canEditTitle = isChefe || isXerife || isDev; // Chefe, Xerife e DEV renomeiam
+  const canEditCard = isChefe || isXerife || isDev; // Chefe, Xerife e DEV editam dados do chamado
+  const canAssignTech = isChefe || isXerife || isDev; // Chefe, Xerife e DEV atribuem técnicos
+  const canChangePriority = isChefe || isXerife || isDev; // Chefe, Xerife e DEV alteram prioridade
+  const canMassIntervene = isXerife || isDev; // Intervenção do Xerife: Xerife e DEV
+  const canMoveStatus = isXerife || isChefe || isDev; // Xerife, Chefe da Seção e DEV movem cards no Kanban
+  const canReplyChat = !isTV; // Chefe, Xerife, Técnicos e DEV respondem chat
+  const canAddNotes = !isTV; // Chefe, Xerife, Técnicos e DEV despacham parecer técnico interno
 
   // Estado para contrair / colapsar categorias / colunas do Kanban
   const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({});
@@ -125,6 +131,38 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
   const [authorName, setAuthorName] = useState<string>(currentUser?.name || 'Seção de TI');
   const [resolutionText, setResolutionText] = useState<string>('');
   const [tiChatInput, setTiChatInput] = useState<string>('');
+
+  // Militares elegíveis para atribuição operacional de chamados:
+  // Regra solicitada: Remover sargentos (Das Deves, Cavalcanti), auxiliar (Sd Castro) e o dev (Guilherme Manfrinato).
+  // Apenas técnicos operacionais (Sd Machado, Sd Oliveira, Sd Vecchiato, Sd Arantes) recebem atribuição direta.
+  const assignableTechnicians = technicians.filter(tc => {
+    const name = tc.name.toLowerCase();
+    const role = (tc.role || '').toLowerCase();
+    const id = tc.id.toLowerCase();
+    if (id === 'tech-dev' || name.includes('manfrinato') || role.includes('desenvolvedor')) return false;
+    if (name.includes('sgt') || name.includes('sargento') || name.includes('das deves') || name.includes('cavalcanti')) return false;
+    if (name.includes('castro') || role.includes('auxiliar') || id === 'tech-castro') return false;
+    return true;
+  });
+
+  // Sincronização e redirecionamento direto ao chamado
+  useEffect(() => {
+    if (initialActiveTicket) {
+      setActiveTicket(initialActiveTicket);
+      onMarkMessagesAsRead(initialActiveTicket.id);
+      onClearInitialTicket?.();
+    }
+  }, [initialActiveTicket, onClearInitialTicket, onMarkMessagesAsRead]);
+
+  // Manter activeTicket em sincronia em tempo real com a lista de tickets (mensagens instantâneas)
+  useEffect(() => {
+    if (activeTicket) {
+      const fresh = tickets.find(t => t.id === activeTicket.id);
+      if (fresh && JSON.stringify(fresh.messages) !== JSON.stringify(activeTicket.messages)) {
+        setActiveTicket(fresh);
+      }
+    }
+  }, [tickets, activeTicket]);
 
   // Modais de Ações do Card: Exclusão, Conclusão e Edição Completa
   const [ticketToDelete, setTicketToDelete] = useState<Ticket | null>(null);
@@ -178,14 +216,20 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
   const openCount = tickets.filter(t => t.status === 'aberto').length;
   const inProgressCount = tickets.filter(t => t.status === 'em_atendimento').length;
   const waitingCount = tickets.filter(t => t.status === 'aguardando').length;
-  const resolvedCount = tickets.filter(t => t.status === 'resolvido').length;
+  const resolvedCount = tickets.filter(t => t.status === 'resolvido' || t.status === 'cancelado').length;
   const criticalCount = tickets.filter(t => t.priority === 'critica' && t.status !== 'resolvido' && t.status !== 'cancelado').length;
 
   // Filtragem dos chamados
   const filteredTickets = tickets.filter(t => {
     if (selectedDeptId !== 'all' && t.departmentId !== selectedDeptId) return false;
     if (selectedPriority !== 'all' && t.priority !== selectedPriority) return false;
-    if (selectedStatus !== 'all' && t.status !== selectedStatus) return false;
+    if (selectedStatus !== 'all') {
+      if (selectedStatus === 'resolvido') {
+        if (t.status !== 'resolvido' && t.status !== 'cancelado') return false;
+      } else if (t.status !== selectedStatus) {
+        return false;
+      }
+    }
     if (selectedTechnicianId !== 'all') {
       if (selectedTechnicianId === 'unassigned' && t.technicianId !== null) return false;
       if (selectedTechnicianId !== 'unassigned' && t.technicianId !== selectedTechnicianId) return false;
@@ -242,8 +286,19 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
     }
   };
 
+  // Regra de exclusividade de diálogo: fechar outras caixas abertas ao disparar um modal
+  const closeOtherModals = () => {
+    setTicketToDelete(null);
+    setTicketToResolve(null);
+    setTicketToEdit(null);
+    setEditingTicketTitle(null);
+    setShowMassInterventionModal(false);
+    setDropRequirement(null);
+  };
+
   // Exclusão rápida de chamado com confirmação via modal (sem window.confirm)
   const handleDeleteTicket = (ticket: Ticket) => {
+    closeOtherModals();
     setTicketToDelete(ticket);
   };
 
@@ -260,6 +315,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
   // Conclusão rápida de chamado com confirmação de despacho via modal (sem window.prompt)
   const handleQuickResolve = (ticket: Ticket) => {
     if (ticket.status === 'resolvido') return;
+    closeOtherModals();
     setTicketToResolve(ticket);
     setResolveNoteInput('Atendimento técnico concluído com sucesso pela Seção de TI.');
   };
@@ -282,6 +338,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
 
   // Alteração completa das informações do card
   const handleOpenEditCard = (ticket: Ticket) => {
+    closeOtherModals();
     setTicketToEdit(ticket);
     setEditTitle(ticket.title);
     setEditDesc(ticket.description);
@@ -503,11 +560,10 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
         </div>
       )}
 
-      {/* Cards de Resumo & Botão Modo TV */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        
-        {/* Contadores */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+      {/* Cards de Resumo & Intervenção Geral */}
+      <div className="w-full">
+        {/* Contadores e Intervenção Geral com mesmo tamanho e layout responsivo */}
+        <div className={`grid grid-cols-2 ${canMassIntervene ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
           <div 
             onClick={() => setSelectedStatus(selectedStatus === 'aberto' ? 'all' : 'aberto')}
             className={`p-4 rounded-2xl bg-white border shadow-xs cursor-pointer transition-all ${
@@ -567,28 +623,32 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
               {resolvedCount}
             </div>
           </div>
-        </div>
 
-        {/* Intervenção do Xerife (exclusivo para perfil Xerife) */}
-        {canMassIntervene && (
-          <div className="shrink-0 flex flex-wrap items-center gap-2.5">
-            <button
+          {/* Card de INTERVENÇÃO GERAL (Mobile e PC - mesmo tamanho e dimensões dos outros cards) */}
+          {canMassIntervene && (
+            <div 
               onClick={() => {
                 setShowMassInterventionModal(true);
                 setMassInterventionText('');
               }}
-              className="px-4 py-3.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md border border-amber-700 transition-all active:scale-[0.99] cursor-pointer"
-              title="Intervenção do Xerife: Enviar comunicado/despacho em massa para todos os chamados em aberto"
+              className="p-4 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white border border-amber-700 shadow-sm cursor-pointer transition-all active:scale-[0.98] flex flex-col justify-between"
+              title="Intervenção Geral: Enviar despacho em massa para todos os chamados em aberto"
             >
-              <Zap className="w-4 h-4 text-yellow-300" />
-              <div className="text-left">
-                <span className="block leading-none">Intervenção do Xerife</span>
-                <span className="text-[9px] text-amber-200 font-mono block mt-0.5">Despacho em Todos os Chamados</span>
+              <div className="flex items-center justify-between text-amber-100 text-xs font-semibold mb-1">
+                <span className="uppercase font-bold tracking-wider text-[11px]">INTERVENÇÃO GERAL</span>
+                <Zap className="w-4 h-4 text-yellow-300 animate-pulse" />
               </div>
-            </button>
-          </div>
-        )}
-
+              <div>
+                <div className="text-sm font-black text-white leading-tight">
+                  DESPACHO GERAL
+                </div>
+                <div className="text-[10px] text-amber-100 font-mono mt-0.5 truncate">
+                  Todos os Chamados
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Barra de Filtros e Busca */}
@@ -1152,7 +1212,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
-                  {filteredTickets.filter(t => t.status === 'resolvido').length}
+                  {filteredTickets.filter(t => t.status === 'resolvido' || t.status === 'cancelado').length}
                 </span>
                 <button
                   type="button"
@@ -1172,7 +1232,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 title="Clique para expandir"
               >
                 <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
-                  Contraído ({filteredTickets.filter(t => t.status === 'resolvido').length})
+                  Contraído ({filteredTickets.filter(t => t.status === 'resolvido' || t.status === 'cancelado').length})
                 </span>
                 <span className="text-[10px] text-emerald-700 font-semibold block hover:underline">
                   Expandir ▾
@@ -1211,9 +1271,47 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     />
                   ))}
 
-                  {filteredTickets.filter(t => t.status === 'resolvido').length === 0 && dragOverColumn !== 'resolvido' && (
+                  {/* Chamados Cancelados: Contraídos e Zebrados dentro da aba de Concluídos */}
+                  {filteredTickets.filter(t => t.status === 'cancelado').length > 0 && (
+                    <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider px-1">
+                        <span>Chamados Cancelados ({filteredTickets.filter(t => t.status === 'cancelado').length})</span>
+                        <span className="text-[10px] font-mono text-slate-400">Contraídos</span>
+                      </div>
+                      {filteredTickets.filter(t => t.status === 'cancelado').map(ticket => (
+                        <div
+                          key={ticket.id}
+                          onClick={() => {
+                            setActiveTicket(ticket);
+                            onMarkMessagesAsRead(ticket.id);
+                          }}
+                          className="p-2.5 rounded-xl border border-slate-300 text-xs cursor-pointer transition-all hover:border-slate-400 hover:shadow-2xs bg-[repeating-linear-gradient(45deg,#f8fafc,#f8fafc_10px,#f1f5f9_10px,#f1f5f9_20px)] opacity-90 hover:opacity-100"
+                          title="Chamado Cancelado (Clique para visualizar histórico e detalhes)"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-black bg-slate-200 text-slate-700 uppercase tracking-wider shrink-0">
+                                CANCELADO
+                              </span>
+                              <span className="font-mono font-bold text-slate-700 text-[11px] shrink-0">
+                                {ticket.code}
+                              </span>
+                              <span className="text-slate-600 truncate font-medium text-[11px]">
+                                {ticket.title}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 shrink-0 font-mono">
+                              {ticket.requesterName}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {filteredTickets.filter(t => t.status === 'resolvido' || t.status === 'cancelado').length === 0 && dragOverColumn !== 'resolvido' && (
                     <div className="p-6 text-center text-xs text-slate-400 font-medium">
-                      Nenhum chamado concluído.
+                      Nenhum chamado concluído ou cancelado.
                     </div>
                   )}
                 </div>
@@ -1351,7 +1449,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                               className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 bg-white"
                             >
                               <option value="">Não Atribuído</option>
-                              {technicians.map(tc => (
+                              {assignableTechnicians.map(tc => (
                                 <option key={tc.id} value={tc.id}>
                                   {tc.name}
                                 </option>
@@ -1475,7 +1573,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                       className="w-full px-3 py-2.5 rounded-xl border-2 border-[#27431e] text-xs font-bold bg-white text-slate-900"
                     >
                       <option value="">Selecione um militar...</option>
-                      {technicians.map(tc => (
+                      {assignableTechnicians.map(tc => (
                         <option key={tc.id} value={tc.id}>
                           {tc.name} ({tc.role})
                         </option>
@@ -1618,27 +1716,27 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
           >
             
             {/* Cabeçalho */}
-            <div className="flex items-start justify-between border-b border-slate-200 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-200 pb-4">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                   <span className="font-mono text-xl font-black text-[#1e3316]">
                     {activeTicket.code}
                   </span>
-                  <span className="text-slate-400">·</span>
+                  <span className="text-slate-300">•</span>
                   <span className="text-sm font-bold text-slate-700">
                     {departments.find(d => d.id === activeTicket.departmentId)?.name}
                   </span>
-                  <span className="text-slate-400">·</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold uppercase ${getPriorityStyle(activeTicket.priority).bg}`}>
+                  <span className="text-slate-300">•</span>
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold uppercase shadow-2xs ${getPriorityStyle(activeTicket.priority).bg}`}>
                     {activeTicket.priority}
                   </span>
                 </div>
-                <h2 className="text-2xl font-black text-slate-900 mt-1">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
                   {activeTicket.title}
                 </h2>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
                 {/* Botão de Comprovante Oficial em PDF */}
                 <button
                   type="button"
@@ -1646,22 +1744,22 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     const deptName = departments.find(d => d.id === activeTicket.departmentId)?.name;
                     await generateTicketPdf(activeTicket, deptName);
                   }}
-                  className="p-2 rounded-xl text-slate-700 hover:text-[#1e3316] hover:bg-slate-100 border border-slate-200 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                  className="px-3 py-2 rounded-xl text-slate-700 hover:text-[#1e3316] hover:bg-slate-100 border border-slate-200 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
                   title="Baixar Comprovante Oficial em PDF com assinatura e autenticação"
                 >
                   <Download className="w-4 h-4 text-[#1e3316]" />
-                  <span className="hidden sm:inline">Comprovante PDF</span>
+                  <span>Comprovante PDF</span>
                 </button>
 
                 {/* Botão de Alterar Informações do Card */}
                 {canEditCard && (
                   <button
                     onClick={() => handleOpenEditCard(activeTicket)}
-                    className="p-2 rounded-xl text-slate-600 hover:text-[#1e3316] hover:bg-slate-100 border border-slate-200 transition-colors flex items-center gap-1.5 text-xs font-bold"
+                    className="px-3 py-2 rounded-xl text-slate-600 hover:text-[#1e3316] hover:bg-slate-100 border border-slate-200 transition-colors flex items-center gap-1.5 text-xs font-bold"
                     title="Alterar informações deste chamado"
                   >
                     <Edit3 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Editar Dados</span>
+                    <span>Editar Dados</span>
                   </button>
                 )}
 
@@ -1735,7 +1833,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                       className="w-full px-3 py-2.5 rounded-xl border-2 border-[#27431e] text-xs font-bold bg-white text-slate-900 shadow-sm"
                     >
                       <option value="">Não Atribuído (Fila)</option>
-                      {technicians.map((tc) => (
+                      {assignableTechnicians.map((tc) => (
                         <option key={tc.id} value={tc.id}>
                           {tc.name} ({tc.role})
                         </option>
@@ -1854,44 +1952,74 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     Nenhuma mensagem registrada neste chamado ainda. Você pode enviar uma previsão ou orientação ao solicitante abaixo.
                   </div>
                 ) : (
-                  activeTicket.messages.map((msg) => (
-                    <div 
-                      key={msg.id}
-                      className={`flex flex-col ${msg.sender === 'ti' ? 'items-end' : 'items-start'}`}
-                    >
-                      <div className={`max-w-[92%] sm:max-w-[85%] p-3 rounded-xl text-xs ${
-                        msg.sender === 'ti'
-                          ? 'bg-[#1e3316] text-[#dfb642] rounded-br-xs shadow-xs'
-                          : 'bg-white border-2 border-amber-300 text-slate-900 rounded-bl-xs shadow-xs'
-                      }`}>
-                        <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-90 font-mono">
-                          <span className="font-bold flex items-center gap-1.5 flex-wrap">
-                            {msg.sender === 'ti' ? (
-                              <>
-                                <span className="inline-block px-1.5 py-0.5 rounded bg-[#dfb642] text-[#1e3316] font-black text-[9px] uppercase">
-                                  TI
+                  activeTicket.messages.map((msg) => {
+                    const isIntervention = msg.content.includes('[INTERVENÇÃO') || msg.content.includes('INTERVENÇÃO GERAL');
+
+                    if (isIntervention) {
+                      return (
+                        <div 
+                          key={msg.id}
+                          className="flex flex-col items-center my-1.5 w-full"
+                        >
+                          <div className="w-full max-w-[96%] p-3.5 rounded-2xl text-xs bg-red-50 border-2 border-red-500 text-red-950 shadow-md">
+                            <div className="flex items-center justify-between gap-3 mb-1.5 text-[10px] font-mono">
+                              <span className="font-bold flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] uppercase tracking-wider animate-pulse">
+                                  <span>⚠️</span> INTERVENÇÃO GERAL
                                 </span>
-                                <span className="text-[#dfb642]">{msg.senderName || 'Seção de TI'}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="inline-block px-1.5 py-0.5 rounded bg-amber-500 text-white font-black text-[9px] uppercase">
-                                  SOLICITANTE
-                                </span>
-                                <span className="text-slate-800">{msg.senderName || activeTicket.requesterName}</span>
-                              </>
-                            )}
-                          </span>
-                          <span className="shrink-0 text-slate-400">
-                            {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                                <span className="text-red-900 font-bold">{msg.senderName || 'Xerife da TI'}</span>
+                              </span>
+                              <span className="shrink-0 text-red-700 font-bold">
+                                {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="leading-relaxed font-semibold whitespace-pre-wrap text-red-900">
+                              {msg.content}
+                            </p>
+                          </div>
                         </div>
-                        <p className="leading-relaxed font-medium whitespace-pre-wrap">
-                          {msg.content}
-                        </p>
+                      );
+                    }
+
+                    return (
+                      <div 
+                        key={msg.id}
+                        className={`flex flex-col ${msg.sender === 'ti' ? 'items-end' : 'items-start'}`}
+                      >
+                        <div className={`max-w-[92%] sm:max-w-[85%] p-3 rounded-xl text-xs ${
+                          msg.sender === 'ti'
+                            ? 'bg-[#1e3316] text-[#dfb642] rounded-br-xs shadow-xs'
+                            : 'bg-white border-2 border-amber-300 text-slate-900 rounded-bl-xs shadow-xs'
+                        }`}>
+                          <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-90 font-mono">
+                            <span className="font-bold flex items-center gap-1.5 flex-wrap">
+                              {msg.sender === 'ti' ? (
+                                <>
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-[#dfb642] text-[#1e3316] font-black text-[9px] uppercase">
+                                    TI
+                                  </span>
+                                  <span className="text-[#dfb642]">{msg.senderName || 'Seção de TI'}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-amber-500 text-white font-black text-[9px] uppercase">
+                                    SOLICITANTE
+                                  </span>
+                                  <span className="text-slate-800">{msg.senderName || activeTicket.requesterName}</span>
+                                </>
+                              )}
+                            </span>
+                            <span className="shrink-0 text-slate-400">
+                              {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="leading-relaxed font-medium whitespace-pre-wrap">
+                            {msg.content}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
@@ -2504,7 +2632,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white text-slate-900"
                   >
                     <option value="">-- Não Atribuído --</option>
-                    {technicians.map(t => (
+                    {assignableTechnicians.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </select>
@@ -2742,9 +2870,20 @@ const KanbanTicketCard: React.FC<KanbanTicketCardProps> = ({
             className="text-[11px] font-bold text-slate-800 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 flex-1 min-w-0 truncate focus:bg-white"
           >
             <option value="">+ Atribuir Militar</option>
-            {technicians.map(tc => (
-              <option key={tc.id} value={tc.id}>{tc.name}</option>
-            ))}
+            {technicians
+              .filter(tc => {
+                const name = tc.name.toLowerCase();
+                const role = (tc.role || '').toLowerCase();
+                const id = tc.id.toLowerCase();
+                if (id === 'tech-dev' || name.includes('manfrinato') || role.includes('desenvolvedor')) return false;
+                if (name.includes('sgt') || name.includes('sargento') || name.includes('das deves') || name.includes('cavalcanti')) return false;
+                if (name.includes('castro') || role.includes('auxiliar') || id === 'tech-castro') return false;
+                return true;
+              })
+              .map(tc => (
+                <option key={tc.id} value={tc.id}>{tc.name}</option>
+              ))
+            }
           </select>
         ) : (
           <div className="text-[11px] font-bold text-slate-600 bg-slate-100 rounded-lg px-2 py-1.5 flex items-center gap-1 flex-1 min-w-0 truncate">

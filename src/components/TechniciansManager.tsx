@@ -25,7 +25,8 @@ import {
   Sparkles,
   RefreshCw,
   FileText,
-  ShieldAlert
+  ShieldAlert,
+  Calendar
 } from 'lucide-react';
 import { 
   Technician, 
@@ -140,11 +141,11 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
   onAddAuditLog,
   onSwitchUser,
 }) => {
-  // Controle de Abas: 'users' (Militares e Logins) | 'audit' (Logs do Sistema) | 'technicians' (Bancada Técnica)
-  const [activeTab, setActiveTab] = useState<'users' | 'audit' | 'technicians'>('users');
+  // Controle de Abas: 'users' (Militares e Logins) | 'audit' (Logs do Sistema)
+  const [activeTab, setActiveTab] = useState<'users' | 'audit'>('users');
 
   // Permissões do usuário atual
-  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'dev' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
   const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
   const isXerife = currentUser?.role === 'CH-XERIFEINFO';
   const canManageUsers = isChefe || isAux || isXerife;
@@ -188,6 +189,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
   const [logSearch, setLogSearch] = useState('');
   const [logFilterAction, setLogFilterAction] = useState('all');
   const [logFilterUser, setLogFilterUser] = useState('all');
+  const [logFilterDate, setLogFilterDate] = useState('');
 
   // Fechamento de qualquer modal ao pressionar ESC
   useEffect(() => {
@@ -530,10 +532,19 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
     }
   };
 
+  // Militares visíveis (o login DEV nunca aparece na listagem de militares da TI)
+  const visibleMilitaryUsers = militaryUsers.filter(u => u.username !== 'dev' && u.role !== 'dev');
+
   // Filtragem de Logs de Auditoria
   const filteredLogs = auditLogs.filter(log => {
     if (logFilterAction !== 'all' && log.actionType !== logFilterAction) return false;
     if (logFilterUser !== 'all' && log.militaryLogin !== logFilterUser) return false;
+    if (logFilterDate) {
+      try {
+        const logDateStr = new Date(log.timestamp).toISOString().slice(0, 10);
+        if (logDateStr !== logFilterDate) return false;
+      } catch {}
+    }
     if (logSearch.trim()) {
       const q = logSearch.toLowerCase();
       const match = (
@@ -603,23 +614,23 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
         })}
       </div>
 
-      {/* Abas de Navegação */}
+      {/* Abas de Navegação (Exclusivas do Chefe de Seção e DEV) */}
       <div className="flex items-center gap-2 border-b border-slate-200">
         <button
           onClick={() => setActiveTab('users')}
-          className={`px-4 py-2.5 rounded-t-xl font-bold text-xs flex items-center gap-2 transition-all border-b-2 ${
+          className={`px-4 py-2.5 rounded-t-xl font-bold text-xs flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
             activeTab === 'users'
               ? 'border-[#27431e] text-[#1e3316] bg-white font-black shadow-xs'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Users className="w-4 h-4 text-[#27431e]" />
-          <span>Militares Cadastrados & Logins ({militaryUsers.length})</span>
+          <span>Militares Cadastrados & Logins ({visibleMilitaryUsers.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('audit')}
-          className={`px-4 py-2.5 rounded-t-xl font-bold text-xs flex items-center gap-2 transition-all border-b-2 ${
+          className={`px-4 py-2.5 rounded-t-xl font-bold text-xs flex items-center gap-2 transition-all border-b-2 cursor-pointer ${
             activeTab === 'audit'
               ? 'border-[#27431e] text-[#1e3316] bg-white font-black shadow-xs'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -628,18 +639,6 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
           <History className="w-4 h-4 text-amber-700" />
           <span>Logs de Auditoria & Ações ({auditLogs.length})</span>
         </button>
-
-        <button
-          onClick={() => setActiveTab('technicians')}
-          className={`px-4 py-2.5 rounded-t-xl font-bold text-xs flex items-center gap-2 transition-all border-b-2 ${
-            activeTab === 'technicians'
-              ? 'border-[#27431e] text-[#1e3316] bg-white font-black shadow-xs'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Wrench className="w-4 h-4 text-slate-600" />
-          <span>Bancada Técnica Operacional ({technicians.length})</span>
-        </button>
       </div>
 
       {/* CONTEÚDO DA ABA 1: MILITARES & LOGINS */}
@@ -647,11 +646,11 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between text-xs text-slate-600">
             <span>Militares com credenciais individuais ativas no 2º GAC.</span>
-            <span className="font-mono text-slate-500">Total: <strong>{militaryUsers.length} militares</strong></span>
+            <span className="font-mono text-slate-500">Total: <strong>{visibleMilitaryUsers.length} militares</strong></span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-            {militaryUsers.map((user) => {
+            {visibleMilitaryUsers.map((user) => {
               const roleMeta = ROLES_INFO[user.role] || ROLES_INFO['CH-TECNICOINFO'];
               const isLogged = currentUser?.id === user.id;
               const isUserLocked = Boolean(user.isLocked || (user.failedAttempts && user.failedAttempts >= 3));
@@ -865,7 +864,29 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Calendário para filtrar logs por data */}
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  <input
+                    type="date"
+                    value={logFilterDate}
+                    onChange={(e) => setLogFilterDate(e.target.value)}
+                    className="text-xs font-semibold bg-transparent focus:outline-none"
+                    title="Filtrar logs por data do calendário"
+                  />
+                  {logFilterDate && (
+                    <button
+                      type="button"
+                      onClick={() => setLogFilterDate('')}
+                      className="text-xs text-slate-400 hover:text-slate-800 font-bold ml-1 cursor-pointer"
+                      title="Limpar filtro de data"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
                 <select
                   value={logFilterAction}
                   onChange={(e) => setLogFilterAction(e.target.value)}
@@ -875,6 +896,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                   <option value="PRORROGACAO_CAUTELA">Prorrogação de Cautela</option>
                   <option value="MENSAGEM_CAUTELA">Mensagem em Cautela</option>
                   <option value="DEVOLUCAO_CAUTELA">Descautela / Devolução</option>
+                  <option value="EDICAO_CAUTELA">Edição de Cautela</option>
                   <option value="INTERVENCAO_XERIFE">Intervenção do Xerife</option>
                   <option value="ATRIBUIR_TECNICO">Atribuição de Técnico</option>
                   <option value="PRIORIDADE_CHAMADO">Alteração de Prioridade</option>
@@ -891,7 +913,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                   className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white"
                 >
                   <option value="all">Todos os Militares</option>
-                  {militaryUsers.map(u => (
+                  {visibleMilitaryUsers.map(u => (
                     <option key={u.id} value={u.username}>{u.name} ({u.username})</option>
                   ))}
                 </select>
@@ -995,75 +1017,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
         </div>
       )}
 
-      {/* CONTEÚDO DA ABA 3: BANCADA TÉCNICA */}
-      {activeTab === 'technicians' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs text-slate-600">
-            <span>Militares escalados como técnicos para atendimento de chamados do regimento.</span>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {technicians.map((tech) => (
-              <div
-                key={tech.id}
-                className={`p-5 rounded-3xl border transition-all bg-white shadow-xs ${
-                  tech.active ? 'border-slate-200 hover:border-[#27431e]' : 'border-slate-200 opacity-60 bg-slate-50'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black text-sm flex items-center justify-center border border-[#cba135]/40 shadow-xs">
-                      {tech.avatar}
-                    </div>
-                    <div>
-                      <h3 className="font-black text-base text-slate-900">
-                        {tech.name}
-                      </h3>
-                      <span className="text-xs font-bold text-[#27431e] block">
-                        {tech.role}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        onUpdateTechnicians(technicians.map(t => t.id === tech.id ? { ...t, active: !t.active } : t));
-                      }}
-                      title={tech.active ? "Marcar como Inativo" : "Marcar como Ativo"}
-                      className={`p-1.5 rounded-lg text-xs font-bold ${
-                        tech.active ? 'text-emerald-700 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-200'
-                      }`}
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 text-xs space-y-1.5 text-slate-600">
-                  <div className="flex items-center gap-2">
-                    <Wrench className="w-3.5 h-3.5 text-[#27431e] shrink-0" />
-                    <span><strong>Especialidade:</strong> {tech.specialty}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5 text-[#27431e] shrink-0" />
-                    <span><strong>E-mail:</strong> {tech.email}</span>
-                  </div>
-                </div>
-
-                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                  <span className={`px-2 py-0.5 rounded font-mono font-bold ${
-                    tech.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    {tech.active ? '● Ativo para Atendimento' : '○ Em Missão / Inativo'}
-                  </span>
-                  <span className="text-slate-400 font-mono">Disponível</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* MODAL 1: CADASTRAR MILITAR COM LOGIN E SENHA */}
       {showAddUserModal && (

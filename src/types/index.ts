@@ -70,6 +70,8 @@ export interface Category {
 }
 
 export type UserRole = 
+  | 'dev'
+  | 'DEV'
   | 'CH-SECINFO' 
   | 'AUX-SECINFO' 
   | 'CH-XERIFEINFO' 
@@ -109,6 +111,7 @@ export interface SystemAuditLog {
     | 'PRORROGACAO_CAUTELA'
     | 'DEVOLUCAO_CAUTELA'
     | 'NOVA_CAUTELA'
+    | 'EDICAO_CAUTELA'
     | 'EXCLUSAO_CAUTELA'
     | 'MENSAGEM_CAUTELA'
     | 'STATUS_CHAMADO'
@@ -218,7 +221,7 @@ export interface NotebookLoan {
   messages?: LoanMessage[];
 }
 
-export type AdminTab = 'it' | 'notebooks' | 'missions' | 'technicians';
+export type AdminTab = 'it' | 'notebooks' | 'missions' | 'technicians' | 'duty_roster';
 
 export interface AccessibilitySettings {
   fontSize: 'normal' | 'large' | 'extralarge';
@@ -255,4 +258,51 @@ export interface AttendanceRecord {
   notes?: string;
   roster: AttendanceRosterItem[];
   createdAt?: string;
+}
+
+// ==================== ESCALA DE SERVIÇO (INFORMÁTICO DE DIA EM DUPLA) ====================
+export interface DutyRosterMilitary {
+  id: string;
+  antiguidade: number; // ANT: 1 a 15
+  gradNome: string; // Ex: SD EV 563 MANFRINATO
+  warName: string;
+  rank: string;
+  active: boolean;
+}
+
+export interface DutyShiftEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  informaticoDiaId: string;
+  informaticoDiaNome: string;
+  auxiliarId: string;
+  auxiliarNome: string;
+  // Passagem de chaves e vistorias
+  chavesDtiOk: boolean;
+  radioTelefoneOk: boolean;
+  ronda16h30Ok: boolean; // 1ª Ronda (Desconexão Elétrica)
+  ronda22h00Ok: boolean; // 2ª Ronda (Backbone & NVR Guarda)
+  ronda06h30Ok: boolean; // 3ª Ronda (Alvorada & Conectividade)
+  antiMeiaFaseOk: boolean; // Protocolo Anti-Meia-Fase
+  livroParte: string;
+  alteracoes: string;
+  assinaturaInformatico?: string;
+  assinaturaAuxiliar?: string;
+  status: 'escalado' | 'em_servico' | 'concluido';
+}
+
+export interface DutySwapRequest {
+  id: string;
+  militarOriginalId: string;
+  militarOriginalNome: string;
+  dataOriginal: string;
+  militarSubstitutoId: string;
+  militarSubstitutoNome: string;
+  dataSubstituta: string;
+  motivo: string;
+  ambosConcordaram: boolean;
+  status: 'sinalizada_xerife' | 'homologada' | 'recusada';
+  sinalizadoPor: string;
+  homologadoPor?: string;
+  createdAt: string;
 }

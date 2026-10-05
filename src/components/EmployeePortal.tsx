@@ -142,20 +142,29 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
     setSearchedCode(searchCodeInput.trim());
   };
 
-  // Busca instantânea automática:
-  // Se o usuário digitar apenas "TICKET" sem números, não busca nada. Só preenche quando colocar os dígitos do chamado.
+  // Busca instantânea estrita:
+  // Requisito obrigatório do usuário: É estritamente obrigatório conter o traço "-" no código (ex: TICKET-1001).
+  // Sem o traço "-", a busca não é executada.
   const rawInput = searchCodeInput.trim().toUpperCase();
+  const hasHyphen = rawInput.includes('-');
   const digitsOnly = rawInput.replace(/\D/g, '');
   const hasDigits = digitsOnly.length > 0;
-  const cleanInput = rawInput.replace(/[^A-Z0-9]/g, '');
 
-  const foundTicket = hasDigits
+  const foundTicket = (hasHyphen && hasDigits)
     ? tickets.find(t => {
-        const cleanCode = t.code.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        const ticketDigits = t.code.replace(/\D/g, '');
-        if (cleanCode === cleanInput) return true;
-        if (digitsOnly.length >= 2 && ticketDigits.endsWith(digitsOnly)) return true;
-        if (cleanInput.length >= 3 && cleanCode.endsWith(cleanInput)) return true;
+        const ticketUpper = t.code.toUpperCase();
+        if (ticketUpper === rawInput) return true;
+        if (ticketUpper.endsWith(rawInput)) return true;
+        const ticketParts = ticketUpper.split('-');
+        const searchParts = rawInput.split('-');
+        const ticketNum = ticketParts[1] || '';
+        const searchNum = searchParts[1] || '';
+        if (searchNum && ticketNum === searchNum) {
+          const searchPrefix = searchParts[0];
+          if (!searchPrefix || searchPrefix === 'TICKET' || ticketParts[0].includes(searchPrefix)) {
+            return true;
+          }
+        }
         return false;
       })
     : null;
@@ -681,14 +690,14 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
               Consultar Andamento do Chamado
             </h2>
             <p className="text-sm text-slate-600 mb-6">
-              Para acompanhar o andamento, digite o <strong>número do seu chamado</strong> presente no comprovante de abertura (ex: <code className="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-[#1e3316]">1001</code> ou <code className="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-[#1e3316]">TICKET-1001</code>). Ao digitar o número, o sistema localiza e carrega os dados automaticamente sem necessidade de clicar em botões.
+              Para acompanhar o andamento, digite o <strong>código do seu chamado com o hífen</strong> presente no comprovante de abertura (ex: <code className="font-mono bg-slate-100 px-2 py-0.5 rounded font-bold text-[#1e3316]">TICKET-1001</code>). É obrigatório incluir o traço <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded font-bold text-red-600">-</code>. Ao digitar o código completo, o sistema localiza os dados automaticamente sem necessidade de clicar em botões.
             </p>
 
             <div className="relative w-full">
               <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Digite o número do chamado (ex: 1001 ou TICKET-1001)..."
+                placeholder="Digite o código com traço (ex: TICKET-1001)..."
                 value={searchCodeInput}
                 onChange={(e) => setSearchCodeInput(e.target.value)}
                 className={`w-full pl-13 pr-12 py-4 rounded-2xl border text-lg font-mono font-bold uppercase focus:ring-2 focus:ring-[#27431e] ${
@@ -710,19 +719,30 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
             </div>
           </div>
 
-          {/* Estado 1: Quando ainda não foi digitado número */}
-          {!hasDigits && (
+          {/* Estado 1: Quando campo está vazio */}
+          {!searchCodeInput.trim() && (
             <div className="p-10 text-center rounded-3xl bg-white border border-slate-200/80 text-slate-500 space-y-2">
               <Search className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="font-bold text-base text-slate-700">Aguardando número do chamado...</p>
+              <p className="font-bold text-base text-slate-700">Aguardando código do chamado...</p>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Digite os dígitos do seu chamado acima (ex: <code className="font-mono font-bold text-[#1e3316]">1001</code> ou <code className="font-mono font-bold text-[#1e3316]">TICKET-1001</code>). O sistema puxará os dados instantaneamente.
+                Digite o código com o traço (ex: <code className="font-mono font-bold text-[#1e3316]">TICKET-1001</code>). O sistema puxará os dados instantaneamente.
               </p>
             </div>
           )}
 
-          {/* Estado 2: Quando foi digitado número mas não encontrou */}
-          {hasDigits && !foundTicket && (
+          {/* Estado 2: Quando digitou sem o traço '-' */}
+          {searchCodeInput.trim() && !hasHyphen && (
+            <div className="p-8 text-center rounded-3xl bg-amber-50 border border-amber-300 text-amber-900 space-y-2">
+              <AlertTriangle className="w-8 h-8 text-amber-600 mx-auto" />
+              <p className="font-bold text-base">Hífen obrigatório no código</p>
+              <p className="text-xs text-amber-800 max-w-md mx-auto">
+                O código do chamado deve conter obrigatoriamente o traço <code className="font-mono font-black text-red-600">-</code> (ex: <code className="font-mono font-black">TICKET-{digitsOnly || '1001'}</code>). Insira o traço para consultar.
+              </p>
+            </div>
+          )}
+
+          {/* Estado 3: Quando digitou com traço mas não encontrou */}
+          {hasHyphen && hasDigits && !foundTicket && (
             <div className="p-10 text-center rounded-3xl bg-white border border-red-200 text-slate-600 space-y-3">
               <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
                 <AlertTriangle className="w-6 h-6" />
@@ -903,44 +923,74 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                             Nenhuma dúvida enviada ainda. Clique em uma das perguntas rápidas abaixo ou digite sua mensagem.
                           </div>
                         ) : (
-                          t.messages.map((msg) => (
-                            <div 
-                              key={msg.id}
-                              className={`flex flex-col ${msg.sender === 'solicitante' ? 'items-end' : 'items-start'}`}
-                            >
-                              <div className={`max-w-[90%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs ${
-                                msg.sender === 'solicitante'
-                                  ? 'bg-[#1e3316] text-[#dfb642] rounded-br-xs shadow-xs'
-                                  : 'bg-white border-2 border-[#cba135] text-slate-900 rounded-bl-xs shadow-sm'
-                              }`}>
-                                <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-90 font-mono">
-                                  <span className="font-bold flex items-center gap-1.5 flex-wrap">
-                                    {msg.sender === 'solicitante' ? (
-                                      <>
-                                        <span className="inline-block px-1.5 py-0.5 rounded bg-[#dfb642] text-[#1e3316] font-black text-[9px] uppercase">
-                                          VOCÊ
+                          t.messages.map((msg) => {
+                            const isIntervention = msg.content.includes('[INTERVENÇÃO') || msg.content.includes('INTERVENÇÃO GERAL');
+
+                            if (isIntervention) {
+                              return (
+                                <div 
+                                  key={msg.id}
+                                  className="flex flex-col items-center my-1.5 w-full"
+                                >
+                                  <div className="w-full max-w-[96%] p-3.5 rounded-2xl text-xs bg-red-50 border-2 border-red-500 text-red-950 shadow-md">
+                                    <div className="flex items-center justify-between gap-3 mb-1.5 text-[10px] font-mono">
+                                      <span className="font-bold flex items-center gap-1.5 flex-wrap">
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] uppercase tracking-wider animate-pulse">
+                                          <span>⚠️</span> INTERVENÇÃO GERAL
                                         </span>
-                                        <span>Militar Solicitante</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <span className="inline-block px-1.5 py-0.5 rounded bg-[#1e3316] text-[#dfb642] font-black text-[9px] uppercase">
-                                          TI
-                                        </span>
-                                        <span className="text-[#1e3316] font-bold">{msg.senderName || 'Militar da TI'}</span>
-                                      </>
-                                    )}
-                                  </span>
-                                  <span className="shrink-0 text-slate-400">
-                                    {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
+                                        <span className="text-red-900 font-bold">{msg.senderName || 'Xerife da TI'}</span>
+                                      </span>
+                                      <span className="shrink-0 text-red-700 font-bold">
+                                        {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    </div>
+                                    <p className="leading-relaxed font-semibold whitespace-pre-wrap text-red-900">
+                                      {msg.content}
+                                    </p>
+                                  </div>
                                 </div>
-                                <p className="leading-relaxed font-medium whitespace-pre-wrap">
-                                  {msg.content}
-                                </p>
+                              );
+                            }
+
+                            return (
+                              <div 
+                                key={msg.id}
+                                className={`flex flex-col ${msg.sender === 'solicitante' ? 'items-end' : 'items-start'}`}
+                              >
+                                <div className={`max-w-[90%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs ${
+                                  msg.sender === 'solicitante'
+                                    ? 'bg-[#1e3316] text-[#dfb642] rounded-br-xs shadow-xs'
+                                    : 'bg-white border-2 border-[#cba135] text-slate-900 rounded-bl-xs shadow-sm'
+                                }`}>
+                                  <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-90 font-mono">
+                                    <span className="font-bold flex items-center gap-1.5 flex-wrap">
+                                      {msg.sender === 'solicitante' ? (
+                                        <>
+                                          <span className="inline-block px-1.5 py-0.5 rounded bg-[#dfb642] text-[#1e3316] font-black text-[9px] uppercase">
+                                            VOCÊ
+                                          </span>
+                                          <span>Militar Solicitante</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="inline-block px-1.5 py-0.5 rounded bg-[#1e3316] text-[#dfb642] font-black text-[9px] uppercase">
+                                            TI
+                                          </span>
+                                          <span className="text-[#1e3316] font-bold">{msg.senderName || 'Militar da TI'}</span>
+                                        </>
+                                      )}
+                                    </span>
+                                    <span className="shrink-0 text-slate-400">
+                                      {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <p className="leading-relaxed font-medium whitespace-pre-wrap">
+                                    {msg.content}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
 

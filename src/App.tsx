@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { Header } from './components/Header';
 import { AdminSidebar } from './components/AdminSidebar';
 import { AdminTopBar } from './components/AdminTopBar';
@@ -9,6 +9,7 @@ import { TechniciansManager } from './components/TechniciansManager';
 import { MissionsManager } from './components/MissionsManager';
 import { TVDashboard } from './components/TVDashboard';
 import { AdminLogin } from './components/AdminLogin';
+import { DutyRoster } from './components/DutyRoster';
 import { 
   Ticket, 
   Department, 
@@ -50,14 +51,79 @@ import {
   saveAccessibilitySettings,
   loadMissions,
   saveMissions,
-  syncAllFromBackend
+  syncAllFromBackend,
+  loadUserAccessibilitySettings,
+  saveUserAccessibilitySettings,
+  onRealtimeSync,
+  broadcastSyncEvent,
+  STORAGE_KEYS
 } from './utils/storage';
 import { api } from './utils/api';
-import { Lock, Globe } from 'lucide-react';
+import { Lock, Globe, ShieldAlert } from 'lucide-react';
 import { IntranetModal } from './components/IntranetModal';
 import malletBg from './assets/mallet_bg.jpg';
 
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('[RedeHelp ErrorBoundary]', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-red-900/60 text-red-400 flex items-center justify-center mx-auto text-2xl font-bold">
+              ⚠️
+            </div>
+            <h2 className="text-xl font-black text-white">Recuperação de Interface</h2>
+            <p className="text-xs text-slate-300">
+              Ocorreu uma inconsistência transitória na tela. Os dados do quartel foram preservados com integridade.
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.reload();
+              }}
+              className="w-full py-3 rounded-xl bg-[#27431e] hover:bg-[#1e3316] text-[#dfb642] font-black text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Recarregar Aplicação
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   // Controle de Rota por URL (/admin vs /)
   const getIsAdminPath = () => {
     if (typeof window === 'undefined') return false;
@@ -73,9 +139,17 @@ export default function App() {
   const [isTvModeOpen, setIsTvModeOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isIntranetModalOpen, setIsIntranetModalOpen] = useState<boolean>(false);
+  const [focusedTicket, setFocusedTicket] = useState<Ticket | null>(null);
   
   // Usuário militar conectado e autenticação
   const [currentUser, setCurrentUser] = useState<MilitaryUser | null>(() => loadCurrentUser());
+  const [originalUser, setOriginalUser] = useState<MilitaryUser | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('eb_original_authenticated_user');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  });
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem('eb_ti_admin_authenticated') === 'true' || !!loadCurrentUser();
@@ -139,6 +213,36 @@ export default function App() {
     });
   }, []);
 
+  // Escuta instantânea de sincronização via BroadcastChannel e Storage Events (multi-abas e multi-janelas em tempo real)
+  useEffect(() => {
+    const unsubscribe = onRealtimeSync((data) => {
+      if (data.type === 'TICKETS_CHANGED') {
+        if (Array.isArray(data.payload)) {
+          setTickets(data.payload);
+        } else {
+          setTickets(loadTickets());
+        }
+      } else if (data.type === 'NOTEBOOK_LOANS_CHANGED') {
+        if (Array.isArray(data.payload)) {
+          setNotebookLoans(data.payload);
+        } else {
+          setNotebookLoans(loadNotebookLoans());
+        }
+      } else if (data.type === 'MISSIONS_CHANGED' || data.type === 'MISSIONS_UPDATED') {
+        if (Array.isArray(data.payload)) {
+          setMissions(data.payload);
+        } else {
+          setMissions(loadMissions());
+        }
+      } else if (data.type === 'STORAGE_CHANGED') {
+        if (data.payload === STORAGE_KEYS.TICKETS) setTickets(loadTickets());
+        if (data.payload === STORAGE_KEYS.NOTEBOOK_LOANS) setNotebookLoans(loadNotebookLoans());
+        if (data.payload === STORAGE_KEYS.MISSIONS) setMissions(loadMissions());
+      }
+    });
+    return unsubscribe;
+  }, []);
+
   // Polling contínuo em background para sincronização em tempo real entre múltiplos dispositivos (PC e Celular)
   useEffect(() => {
     let isMounted = true;
@@ -178,7 +282,7 @@ export default function App() {
       } catch (err) {
         // Silêncio em falha transitória de polling
       }
-    }, 2500);
+    }, 1500);
 
     return () => {
       isMounted = false;
@@ -221,7 +325,10 @@ export default function App() {
 
   useEffect(() => {
     saveAccessibilitySettings(a11y);
-  }, [a11y]);
+    if (currentUser?.username) {
+      saveUserAccessibilitySettings(currentUser.username, a11y);
+    }
+  }, [a11y, currentUser]);
 
   // Função utilitária para registrar logs de auditoria
   const handleAddAuditLog = (logItem: Omit<SystemAuditLog, 'id' | 'timestamp'>) => {
@@ -231,8 +338,16 @@ export default function App() {
 
   const handleAdminLoginSuccess = (user: MilitaryUser) => {
     setCurrentUser(user);
+    setOriginalUser(user);
+    sessionStorage.setItem('eb_original_authenticated_user', JSON.stringify(user));
     setIsAdminAuthenticated(true);
     saveCurrentUser(user);
+
+    // Carregar configurações de acessibilidade do usuário se existirem
+    const userA11y = loadUserAccessibilitySettings(user.username);
+    if (userA11y) {
+      setA11y(userA11y);
+    }
 
     handleAddAuditLog({
       militaryName: user.name,
@@ -248,6 +363,8 @@ export default function App() {
   };
 
   const handleAdminLogout = () => {
+    sessionStorage.removeItem('eb_original_authenticated_user');
+    setOriginalUser(null);
     if (currentUser) {
       handleAddAuditLog({
         militaryName: currentUser.name,
@@ -593,7 +710,7 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
 
-    setMissions(prev => prev.map(m => {
+    const updatedMissions = missions.map(m => {
       if (m.id !== missionId) return m;
       const updatedNotes = [...(m.notes || []), newNote];
       api.updateMission(missionId, { notes: updatedNotes }).catch(() => {});
@@ -601,7 +718,10 @@ export default function App() {
         ...m,
         notes: updatedNotes,
       };
-    }));
+    });
+
+    setMissions(updatedMissions);
+    saveMissions(updatedMissions);
 
     handleAddAuditLog({
       militaryName: author,
@@ -624,18 +744,18 @@ export default function App() {
     }));
   };
 
-  // Handler: Intervenção em Massa (Xerife envia mensagem em todos os chamados abertos)
+  // Handler: Intervenção Geral / em Massa (Xerife envia mensagem em todos os chamados abertos)
   const handleMassIntervention = (message: string) => {
     const author = currentUser?.name ? `${currentUser.name} (Xerife)` : 'Xerife da TI';
     const activeTicketsCount = tickets.filter(t => t.status !== 'resolvido' && t.status !== 'cancelado').length;
 
-    setTickets(prev => prev.map(t => {
+    const updatedTickets = tickets.map(t => {
       if (t.status === 'resolvido' || t.status === 'cancelado') return t;
       const interventionMsg: TicketMessage = {
         id: `msg-interv-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         sender: 'ti',
         senderName: author,
-        content: `[INTERVENÇÃO DA GERÊNCIA TÉCNICA / XERIFE]: ${message}`,
+        content: `[INTERVENÇÃO GERAL / XERIFE DA TI]: ${message}`,
         createdAt: new Date().toISOString(),
         readByTi: true,
       };
@@ -646,14 +766,17 @@ export default function App() {
         messages: [...(t.messages || []), interventionMsg],
         updatedAt: new Date().toISOString(),
       };
-    }));
+    });
+
+    setTickets(updatedTickets);
+    saveTickets(updatedTickets);
 
     handleAddAuditLog({
       militaryName: currentUser?.name || 'Xerife da TI',
       militaryLogin: currentUser?.username || 'xerife',
       role: currentUser?.role || 'CH-XERIFEINFO',
       actionType: 'INTERVENCAO_XERIFE',
-      summary: `Realizou intervenção global enviando mensagem para ${activeTicketsCount} chamado(s) em aberto`,
+      summary: `Realizou intervenção geral enviando despacho para ${activeTicketsCount} chamado(s) em aberto`,
       details: `Mensagem: "${message}"`,
       targetRef: 'TODOS_CHAMADOS',
     });
@@ -671,8 +794,8 @@ export default function App() {
       readByTi: sender === 'ti',
     };
 
-    // Atualização otimista no estado local
-    setTickets(prev => prev.map(t => {
+    // Atualização otimista no estado local e salvamento imediato no storage com broadcast
+    const updatedTickets = tickets.map(t => {
       if (t.id === ticketId) {
         const currentMessages = t.messages || [];
         return {
@@ -682,13 +805,20 @@ export default function App() {
         };
       }
       return t;
-    }));
+    });
+
+    setTickets(updatedTickets);
+    saveTickets(updatedTickets);
 
     // Sincronizar e salvar no banco de dados (MySQL / SQLite / JSON)
     api.sendTicketMessage(ticketId, content, sender, senderName)
       .then(res => {
         if (res?.ticket?.messages) {
-          setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, messages: res.ticket.messages } : t));
+          setTickets(prev => {
+            const next = prev.map(t => t.id === ticketId ? { ...t, messages: res.ticket.messages } : t);
+            saveTickets(next);
+            return next;
+          });
         }
       })
       .catch(err => {
@@ -948,7 +1078,7 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
 
-    setNotebookLoans(prev => prev.map(l => {
+    const updatedLoans = notebookLoans.map(l => {
       if (l.id !== loanId) return l;
       const updatedMessages = [...(l.messages || []), newMsg];
       
@@ -961,7 +1091,10 @@ export default function App() {
         ...l,
         messages: updatedMessages,
       };
-    }));
+    });
+
+    setNotebookLoans(updatedLoans);
+    saveNotebookLoans(updatedLoans);
 
     handleAddAuditLog({
       militaryName: currentUser?.name || senderName,
@@ -1083,8 +1216,18 @@ export default function App() {
 
   // Alternar militar na sessão (para testar permissões)
   const handleSwitchUser = (user: MilitaryUser) => {
+    if (!originalUser && currentUser) {
+      setOriginalUser(currentUser);
+      sessionStorage.setItem('eb_original_authenticated_user', JSON.stringify(currentUser));
+    }
     setCurrentUser(user);
     saveCurrentUser(user);
+
+    const userA11y = loadUserAccessibilitySettings(user.username);
+    if (userA11y) {
+      setA11y(userA11y);
+    }
+
     handleAddAuditLog({
       militaryName: user.name,
       militaryLogin: user.username,
@@ -1141,6 +1284,32 @@ export default function App() {
 
           {/* Área Principal Direita do Dashboard */}
           <div className="flex-1 flex flex-col min-w-0 max-w-full min-h-screen bg-[#f4f6f2] overflow-x-clip">
+            {/* Banner de Simulação de Permissões com Botão para Restaurar Conta Original */}
+            {originalUser && currentUser && originalUser.username !== currentUser.username && (
+              <div className="sticky top-0 z-40 bg-[#1e3316] text-[#dfb642] px-4 py-2 border-b-2 border-[#dfb642] flex flex-wrap items-center justify-between gap-2 text-xs font-bold shadow-md">
+                <div className="flex items-center gap-2 min-w-0">
+                  <ShieldAlert className="w-4 h-4 text-[#dfb642] animate-pulse shrink-0" />
+                  <span className="truncate">
+                    SIMULAÇÃO DE PERMISSÕES ATIVA: Você está operando como <strong>{currentUser.name}</strong> ({currentUser.role}).
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentUser(originalUser);
+                    saveCurrentUser(originalUser);
+                    sessionStorage.removeItem('eb_original_authenticated_user');
+                    setOriginalUser(null);
+                    const origA11y = loadUserAccessibilitySettings(originalUser.username);
+                    if (origA11y) setA11y(origA11y);
+                  }}
+                  className="px-3.5 py-1 bg-[#dfb642] text-[#192b14] hover:bg-yellow-400 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95 shrink-0"
+                >
+                  <span>↩ Voltar para {originalUser.name} ({originalUser.role})</span>
+                </button>
+              </div>
+            )}
+
             <AdminTopBar
               adminTab={adminTab}
               onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
@@ -1151,7 +1320,8 @@ export default function App() {
               currentUser={currentUser}
               tickets={tickets}
               departments={departments}
-              onOpenTicketWithDoubts={() => {
+              onOpenTicketWithDoubts={(ticket) => {
+                setFocusedTicket(ticket);
                 setAdminTab('it');
               }}
               a11y={a11y}
@@ -1177,6 +1347,8 @@ export default function App() {
                   onSendMessage={handleSendMessage}
                   onMarkMessagesAsRead={handleMarkMessagesAsRead}
                   onMassIntervention={handleMassIntervention}
+                  initialActiveTicket={focusedTicket}
+                  onClearInitialTicket={() => setFocusedTicket(null)}
                 />
               )}
 
@@ -1223,6 +1395,16 @@ export default function App() {
                   onUpdateMilitaryUsers={setMilitaryUsers}
                   onAddAuditLog={handleAddAuditLog}
                   onSwitchUser={handleSwitchUser}
+                />
+              )}
+
+              {adminTab === 'duty_roster' && (
+                <DutyRoster
+                  currentUser={currentUser}
+                  militaryUsers={militaryUsers}
+                  technicians={technicians}
+                  a11y={a11y}
+                  onAddAuditLog={handleAddAuditLog}
                 />
               )}
             </main>

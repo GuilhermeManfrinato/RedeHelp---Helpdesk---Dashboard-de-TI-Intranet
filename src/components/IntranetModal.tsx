@@ -112,11 +112,13 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
   const [linkToDelete, setLinkToDelete] = useState<IntranetLink | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Permissões militares da Intranet:
-  // Se o usuário está autenticado no painel de TI (isAdminAuthenticated = true ou currentUser conectado),
-  // ele possui permissão total de gerenciamento (adicionar, editar e excluir links com a lixeira)
-  const isAdminUser = Boolean(isAdminAuthenticated || currentUser);
-  const canDeleteIntranetLink = isAdminUser;
+  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || isDev;
+  const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
+  // Técnicos NÃO podem adicionar/editar/excluir links; apenas Chefe, Auxiliar e DEV
+  const canManageIntranetLinks = isChefe || isAux || isDev;
+  const canSaveDefault = isDev;
+  const [saveDefaultSuccess, setSaveDefaultSuccess] = useState(false);
 
   // Sincronização com o banco de dados (SQLite/MySQL via API) ao abrir o modal
   useEffect(() => {
@@ -176,7 +178,7 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdminUser) return;
+    if (!canManageIntranetLinks) return;
     if (!title.trim() || !url.trim()) return;
 
     if (editingLink) {
@@ -223,10 +225,27 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
     setLinkToDelete(null);
   };
 
-  const confirmResetLinks = () => {
-    setLinks(DEFAULT_INTRANET_LINKS);
+  const handleSaveAsDefault = () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_INTRANET_LINKS));
+      localStorage.setItem('eb_deodoro_intranet_default_links', JSON.stringify(links));
+      setSaveDefaultSuccess(true);
+      setTimeout(() => setSaveDefaultSuccess(false), 3000);
+    } catch {
+      alert('Erro ao salvar padrão de links.');
+    }
+  };
+
+  const confirmResetLinks = () => {
+    let targetDefaults = DEFAULT_INTRANET_LINKS;
+    try {
+      const savedDefault = localStorage.getItem('eb_deodoro_intranet_default_links');
+      if (savedDefault) {
+        targetDefaults = JSON.parse(savedDefault);
+      }
+    } catch {}
+    setLinks(targetDefaults);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(targetDefaults));
     } catch {}
     setShowResetConfirm(false);
   };
@@ -267,7 +286,7 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {isAdminUser && (
+            {canManageIntranetLinks && (
               <button
                 onClick={() => {
                   setShowAddForm(!showAddForm);
@@ -293,8 +312,8 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
           </div>
         </div>
 
-        {/* Formulário de Adicionar / Editar Link (Apenas militares do Admin) */}
-        {isAdminUser && showAddForm && (
+        {/* Formulário de Adicionar / Editar Link (Apenas Chefe, Auxiliar e DEV) */}
+        {canManageIntranetLinks && showAddForm && (
           <form onSubmit={handleSave} className="p-4 rounded-2xl bg-[#f4f6f2] border border-[#27431e]/30 space-y-3 text-xs">
             <div className="font-bold text-slate-900 flex items-center gap-2">
               <Server className="w-4 h-4 text-[#27431e]" />
@@ -413,8 +432,8 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
                             )}
                           </button>
 
-                          {/* Botão Editar Link: apenas logado no painel admin */}
-                          {isAdminUser && (
+                          {/* Botão Editar Link: apenas Chefe, Auxiliar e DEV */}
+                          {canManageIntranetLinks && (
                             <button
                               type="button"
                               onClick={() => {
@@ -432,8 +451,8 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
                             </button>
                           )}
 
-                          {/* Botão Deletar Link (Lixeira): Liberado para militares autenticados no Painel de TI */}
-                          {canDeleteIntranetLink && (
+                          {/* Botão Deletar Link (Lixeira): apenas Chefe, Auxiliar e DEV */}
+                          {canManageIntranetLinks && (
                             <button
                               type="button"
                               onClick={() => setLinkToDelete(link)}
@@ -474,18 +493,30 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
         </div>
 
         {/* Rodapé do Modal com Informações e Reset */}
-        <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
           <div className="flex items-center gap-1 font-mono text-[11px]">
             <span>
-              {isAdminUser 
-                ? 'Permissão: Gestão Completa de Links da TI (Adição, Edição e Exclusão)' 
-                : 'Acesso Público: Somente cópia de URL e navegação'}
+              {canManageIntranetLinks 
+                ? 'Permissão: Gestão de Links da TI (Chefe / Auxiliar / DEV)' 
+                : 'Acesso Padrão: Somente consulta e navegação'}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {isAdminUser && (
+            {canSaveDefault && (
               <button
+                type="button"
+                onClick={handleSaveAsDefault}
+                className="text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-300 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                title="Salvar esta lista de links como padrão oficial (Exclusivo DEV)"
+              >
+                <span>💾 Salvar Padrão</span>
+                {saveDefaultSuccess && <span className="text-emerald-700">✓ Salvo!</span>}
+              </button>
+            )}
+            {canManageIntranetLinks && (
+              <button
+                type="button"
                 onClick={() => setShowResetConfirm(true)}
                 className="text-[11px] font-bold text-slate-500 hover:text-[#192b14] flex items-center gap-1 hover:underline cursor-pointer"
                 title="Restaurar a lista original de links do Regimento"
