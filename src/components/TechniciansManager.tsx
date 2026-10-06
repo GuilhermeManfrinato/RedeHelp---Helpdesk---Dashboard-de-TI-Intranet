@@ -26,7 +26,8 @@ import {
   RefreshCw,
   FileText,
   ShieldAlert,
-  Calendar
+  Calendar,
+  Printer
 } from 'lucide-react';
 import { 
   Technician, 
@@ -917,6 +918,16 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                     <option key={u.id} value={u.username}>{u.name} ({u.username})</option>
                   ))}
                 </select>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-2 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center gap-1.5 hover:bg-[#27431e] cursor-pointer shadow-xs border border-[#cba135]/40"
+                  title="Imprimir relatório completo de auditoria e Livro de Registro da TI"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir Livro de Parte / Logs</span>
+                </button>
               </div>
             </div>
 

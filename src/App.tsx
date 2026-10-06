@@ -98,15 +98,36 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             <p className="text-xs text-slate-300">
               Ocorreu uma inconsistência transitória na tela. Os dados do quartel foram preservados com integridade.
             </p>
-            <button
-              onClick={() => {
-                this.setState({ hasError: false });
-                window.location.reload();
-              }}
-              className="w-full py-3 rounded-xl bg-[#27431e] hover:bg-[#1e3316] text-[#dfb642] font-black text-xs uppercase tracking-wider transition-colors cursor-pointer"
-            >
-              Recarregar Aplicação
-            </button>
+            {this.state.error && (
+              <div className="text-left bg-black/40 border border-red-900/50 p-2.5 rounded-xl text-red-300 font-mono text-[10px] overflow-auto max-h-24">
+                <strong>Diagnóstico:</strong> {this.state.error.message}
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false });
+                  window.location.reload();
+                }}
+                className="flex-1 py-3 rounded-xl bg-[#27431e] hover:bg-[#1e3316] text-[#dfb642] font-black text-xs uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Recarregar Aplicação
+              </button>
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('eb_duty_roster_shifts_v1');
+                    localStorage.removeItem('eb_roster_military_v2');
+                  } catch {}
+                  this.setState({ hasError: false });
+                  window.location.reload();
+                }}
+                className="px-4 py-3 rounded-xl bg-red-800/80 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer border border-red-700"
+                title="Limpar caches transitórios e reiniciar"
+              >
+                Limpar Cache
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -1398,7 +1419,7 @@ function AppContent() {
                 />
               )}
 
-              {adminTab === 'duty_roster' && (
+              {adminTab === 'duty_roster' && currentUser?.role !== 'CH-TVINFO' && (
                 <DutyRoster
                   currentUser={currentUser}
                   militaryUsers={militaryUsers}

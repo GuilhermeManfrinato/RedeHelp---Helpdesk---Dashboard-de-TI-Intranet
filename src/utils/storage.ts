@@ -10,7 +10,9 @@ import {
   Mission,
   AttendanceRecord,
   DutyShiftEntry,
-  DutySwapRequest
+  DutySwapRequest,
+  KeyHandoverRecord,
+  MilitaryLeaveRecord
 } from '../types';
 import { 
   initialTickets, 
@@ -39,6 +41,8 @@ export const STORAGE_KEYS = {
   ATTENDANCE_RECORDS: 'eb_attendance_records_v1',
   DUTY_ROSTER_SHIFTS: 'eb_duty_roster_shifts_v1',
   DUTY_SWAPS: 'eb_duty_swaps_v1',
+  KEY_HANDOVERS: 'eb_key_handovers_v1',
+  MILITARY_LEAVES: 'eb_military_leaves_v1',
 };
 
 // Sincronização inicial com o banco Sequelize em background
@@ -150,7 +154,14 @@ export const loadTechnicians = (): Technician[] => {
       localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(initialTechnicians));
       return initialTechnicians;
     }
-    return JSON.parse(raw);
+    const parsed: Technician[] = JSON.parse(raw);
+    const missing = initialTechnicians.filter(it => !parsed.some(p => p.id === it.id || p.name === it.name));
+    if (missing.length > 0) {
+      const merged = [...parsed, ...missing];
+      localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(merged));
+      return merged;
+    }
+    return parsed;
   } catch (e) {
     return initialTechnicians;
   }
@@ -221,7 +232,14 @@ export const loadMilitaryUsers = (): MilitaryUser[] => {
       localStorage.setItem(STORAGE_KEYS.MILITARY_USERS, JSON.stringify(initialMilitaryUsers));
       return initialMilitaryUsers;
     }
-    return JSON.parse(raw);
+    const parsed: MilitaryUser[] = JSON.parse(raw);
+    const missing = initialMilitaryUsers.filter(iu => !parsed.some(p => p.username === iu.username));
+    if (missing.length > 0) {
+      const merged = [...parsed, ...missing];
+      localStorage.setItem(STORAGE_KEYS.MILITARY_USERS, JSON.stringify(merged));
+      return merged;
+    }
+    return parsed;
   } catch (e) {
     return initialMilitaryUsers;
   }
@@ -448,13 +466,30 @@ export const saveAttendanceRecords = (records: AttendanceRecord[]) => {
   }
 };
 
-// ==================== ESCALA DE SERVIÇO (1x7 EM DUPLA) ====================
+// ==================== ESCALA DE SERVIÇO (1x6 PRETA E VERMELHA) ====================
 export const loadDutyRosterShifts = (): DutyShiftEntry[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.DUTY_ROSTER_SHIFTS);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((s: any) => ({
+      ...s,
+      permanenciaId: s.permanenciaId || s.informaticoDiaId || '',
+      permanenciaNome: s.permanenciaNome || s.informaticoDiaNome || 'Não Escalado',
+      sobreavisoId: s.sobreavisoId || s.auxiliarId || '',
+      sobreavisoNome: s.sobreavisoNome || s.auxiliarNome || 'Não Escalado',
+      isAdministrativeDay: typeof s.isAdministrativeDay === 'boolean' ? s.isAdministrativeDay : false,
+      chavesDtiOk: !!s.chavesDtiOk,
+      radioTelefoneOk: !!s.radioTelefoneOk,
+      ronda1PosExpedienteOk: s.ronda1PosExpedienteOk ?? s.ronda16h30Ok ?? false,
+      ronda2PosPernoiteOk: s.ronda2PosPernoiteOk ?? s.ronda22h00Ok ?? false,
+      ronda3PreParadaOk: s.ronda3PreParadaOk ?? s.ronda06h30Ok ?? false,
+      antiMeiaFaseOk: !!s.antiMeiaFaseOk,
+      livroParte: s.livroParte || '',
+      alteracoes: s.alteracoes || 'Sem alterações.',
+      status: s.status || 'escalado',
+    }));
   } catch (e) {
     return [];
   }
@@ -486,6 +521,48 @@ export const saveDutySwaps = (swaps: DutySwapRequest[]) => {
     broadcastSyncEvent('DUTY_SWAPS_CHANGED', swaps.length);
   } catch (e) {
     console.error('Erro ao salvar trocas de escala:', e);
+  }
+};
+
+// ==================== PASSAGEM DE CHAVES (DTI, INFORMÁTICA, SERVIDOR) ====================
+export const loadKeyHandovers = (): KeyHandoverRecord[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.KEY_HANDOVERS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveKeyHandovers = (handovers: KeyHandoverRecord[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.KEY_HANDOVERS, JSON.stringify(handovers));
+    broadcastSyncEvent('KEY_HANDOVERS_CHANGED', handovers.length);
+  } catch (e) {
+    console.error('Erro ao salvar passagem de chaves:', e);
+  }
+};
+
+// ==================== AFASTAMENTOS, FÉRIAS E BAIXAS ====================
+export const loadMilitaryLeaves = (): MilitaryLeaveRecord[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.MILITARY_LEAVES);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const saveMilitaryLeaves = (leaves: MilitaryLeaveRecord[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.MILITARY_LEAVES, JSON.stringify(leaves));
+    broadcastSyncEvent('MILITARY_LEAVES_CHANGED', leaves.length);
+  } catch (e) {
+    console.error('Erro ao salvar afastamentos militares:', e);
   }
 };
 

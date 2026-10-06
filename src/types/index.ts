@@ -260,35 +260,91 @@ export interface AttendanceRecord {
   createdAt?: string;
 }
 
-// ==================== ESCALA DE SERVIÇO (INFORMÁTICO DE DIA EM DUPLA) ====================
+// ==================== ESCALA DE SERVIÇO (1x6 PRETA E VERMELHA) ====================
+export type KeyNameType = 'DTI' | 'Informática' | 'Servidor';
+
+export interface KeyHandoverRecord {
+  id: string;
+  keyName: KeyNameType;
+  giverId: string;
+  giverName: string;
+  receiverId: string;
+  receiverName: string;
+  timestamp: string; // ISO
+  notes?: string;
+  giverSigned: boolean;
+  receiverSigned: boolean;
+}
+
 export interface DutyRosterMilitary {
   id: string;
-  antiguidade: number; // ANT: 1 a 15
-  gradNome: string; // Ex: SD EV 563 MANFRINATO
+  antiguidade: number; // ANT: 1 a 12
+  gradNome: string; // Ex: SD EV FERREIRA (05)
   warName: string;
   rank: string;
+  category: 'EP' | 'EV';
+  number?: string;
   active: boolean;
+  isBaixado?: boolean;
+  motivoBaixa?: string;
 }
 
 export interface DutyShiftEntry {
   id: string;
   date: string; // YYYY-MM-DD
-  informaticoDiaId: string;
-  informaticoDiaNome: string;
-  auxiliarId: string;
-  auxiliarNome: string;
+  isAdministrativeDay?: boolean; // Chefe de Seção marcou como administrativo (preto vira vermelho)
+  permanenciaId: string;
+  permanenciaNome: string;
+  permanenciaSigned?: boolean;
+  permanenciaSignedAt?: string;
+  sobreavisoId: string;
+  sobreavisoNome: string;
+  sobreavisoSigned?: boolean;
+  sobreavisoSignedAt?: string;
   // Passagem de chaves e vistorias
   chavesDtiOk: boolean;
   radioTelefoneOk: boolean;
-  ronda16h30Ok: boolean; // 1ª Ronda (Desconexão Elétrica)
-  ronda22h00Ok: boolean; // 2ª Ronda (Backbone & NVR Guarda)
-  ronda06h30Ok: boolean; // 3ª Ronda (Alvorada & Conectividade)
+  ronda1PosExpedienteOk: boolean; // 1ª Ronda (Pós-expediente: Desconexão Elétrica)
+  ronda2PosPernoiteOk: boolean; // 2ª Ronda (Pós-pernoite: Verificação Geral + PC do Sargento)
+  ronda2ServerChecklist?: {
+    pingGateways: boolean;
+    dhcpDnsSamba: boolean;
+    statusBancoDados: boolean;
+    backupStorage: boolean;
+    uptimeCheck: boolean;
+    logsErrorCheck: boolean;
+  };
+  ronda3PreParadaOk: boolean; // 3ª Ronda (Pré-parada diária: Salas Prioritárias)
+  ronda3SalasChecklist?: {
+    comando: boolean;
+    s1: boolean;
+    s2: boolean;
+    s3: boolean;
+    informatica: boolean;
+    juridico: boolean;
+    sfpc: boolean;
+    secretaria: boolean;
+  };
   antiMeiaFaseOk: boolean; // Protocolo Anti-Meia-Fase
   livroParte: string;
   alteracoes: string;
-  assinaturaInformatico?: string;
-  assinaturaAuxiliar?: string;
   status: 'escalado' | 'em_servico' | 'concluido';
+  swapInfo?: {
+    originalDate: string;
+    targetDate: string;
+    solicitante: string;
+    substituto: string;
+    motivo: string;
+    homologadoPor: string;
+    homologadoAt: string;
+  };
+  extraMilitaries?: DutyShiftExtraMilitary[];
+}
+
+export interface DutyShiftExtraMilitary {
+  militarId: string;
+  militarNome: string;
+  tipo: 'permanencia' | 'sobreaviso';
 }
 
 export interface DutySwapRequest {
@@ -306,3 +362,19 @@ export interface DutySwapRequest {
   homologadoPor?: string;
   createdAt: string;
 }
+
+export type MilitaryLeaveType = 'ferias' | 'baixa' | 'missao' | 'licenca' | 'dispensa' | 'outros';
+
+export interface MilitaryLeaveRecord {
+  id: string;
+  militarId: string;
+  militarNome: string;
+  tipo: MilitaryLeaveType;
+  dataInicio: string; // YYYY-MM-DD
+  dataFim: string; // YYYY-MM-DD
+  dias: number;
+  motivo: string;
+  registradoPor: string;
+  createdAt: string;
+}
+
