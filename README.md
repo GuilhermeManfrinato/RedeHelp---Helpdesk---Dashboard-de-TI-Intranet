@@ -50,7 +50,7 @@ Totalmente containerizado via **Docker**, a aplicação garante fácil implanta�
 | **Build Tool** | ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white) | Bundler rápido para ambiente de Dev e Prod |
 | **Estilização** | ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white) | Design moderno, limpo e responsivo |
 | **Backend** | ![NodeJS](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white) | Servidor API RESTful (`tsx server.ts`) |
-| **Banco de Dados** | ![MySQL](https://img.shields.io/badge/MySQL_8.0-4479A1?style=flat-square&logo=mysql&logoColor=white) | Persistência de dados relacional |
+| **Banco de Dados** | ![MySQL](https://img.shields.io/badge/MySQL_8.0-4479A1?style=flat-square&logo=mysql&logoColor=white) | Persistência de dados relacional e criptografado |
 | **Containers** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) | Orquestração da aplicação e banco via Docker Compose |
 
 ---
