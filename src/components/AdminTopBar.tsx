@@ -60,7 +60,7 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
   a11y,
   onUpdateA11y,
 }) => {
-  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev';
+  const isDev = currentUser?.role === 'System Developer' || currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev';
   const [clockOffsetMs, setClockOffsetMs] = useState<number>(() => {
     const saved = localStorage.getItem('redehelp_dev_clock_offset');
     return saved ? parseInt(saved, 10) || 0 : 0;
@@ -142,18 +142,25 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
 
   const getRoleBadge = (role?: string) => {
     switch (role) {
+      case 'System Developer':
+      case 'dev':
+      case 'DEV':
+        return 'bg-purple-100 text-purple-900 border-purple-300';
       case 'CH-SECINFO':
       case 'CHSECINFO':
         return 'bg-amber-100 text-amber-900 border-amber-300';
       case 'AUX-SECINFO':
       case 'AUXSECINFO':
         return 'bg-teal-100 text-teal-900 border-teal-300';
+      case 'INF-XERIFE':
       case 'CH-XERIFEINFO':
       case 'XERIFESECINFO':
         return 'bg-blue-100 text-blue-900 border-blue-300';
+      case 'INF-TECNICO':
       case 'CH-TECNICOINFO':
       case 'TECINFO':
         return 'bg-emerald-100 text-emerald-900 border-emerald-300';
+      case 'INF-TV':
       case 'CH-TVINFO':
         return 'bg-purple-100 text-purple-900 border-purple-300';
       default:
@@ -213,17 +220,50 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
         {/* Identificação do Militar Conectado */}
         {currentUser && (
           <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-            <div className="w-7 h-7 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-[11px] flex items-center justify-center border border-[#cba135]/40 shrink-0">
-              {currentUser.warName.slice(0, 2).toUpperCase()}
-            </div>
+            {currentUser.avatar && (currentUser.avatar.startsWith('data:image') || currentUser.avatar.startsWith('http')) ? (
+              <img 
+                src={currentUser.avatar} 
+                alt={currentUser.name} 
+                className="w-7 h-7 rounded-xl object-cover border border-[#cba135]/40 shrink-0 shadow-2xs" 
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-xl bg-[#1e3316] text-[#dfb642] font-black text-[11px] flex items-center justify-center border border-[#cba135]/40 shrink-0">
+                {currentUser.warName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <div className="text-left">
               <span className="font-bold text-slate-900 block leading-tight text-xs">
                 {currentUser.name}
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`px-1.5 py-0.2 rounded font-mono font-black text-[9px] border ${getRoleBadge(currentUser.role)}`}>
-                  {currentUser.role}
-                </span>
+                {(() => {
+                  let cleanRole = currentUser.role;
+                  if (
+                    currentUser.username === 'dev' || 
+                    currentUser.name?.toLowerCase().includes('manfrinato') || 
+                    currentUser.warName?.toLowerCase().includes('manfrinato') || 
+                    currentUser.role === 'dev' || 
+                    currentUser.role === 'DEV' ||
+                    currentUser.role === 'System Developer'
+                  ) {
+                    cleanRole = 'System Developer';
+                  } else if (currentUser.role === 'CH-TECNICOINFO' || currentUser.role === 'TECINFO') {
+                    cleanRole = 'INF-TECNICO';
+                  } else if (currentUser.role === 'CH-XERIFEINFO' || currentUser.role === 'XERIFESECINFO') {
+                    cleanRole = 'INF-XERIFE';
+                  } else if (currentUser.role === 'CH-TVINFO') {
+                    cleanRole = 'INF-TV';
+                  } else if (currentUser.role === 'CHSECINFO') {
+                    cleanRole = 'CH-SECINFO';
+                  } else if (currentUser.role === 'AUXSECINFO') {
+                    cleanRole = 'AUX-SECINFO';
+                  }
+                  return (
+                    <span className={`px-1.5 py-0.2 rounded font-mono font-black text-[9px] border ${getRoleBadge(cleanRole)}`}>
+                      {cleanRole}
+                    </span>
+                  );
+                })()}
                 <span className="text-[10px] text-slate-400 font-mono">@{currentUser.username}</span>
               </div>
             </div>
@@ -285,9 +325,9 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
             <div 
               className={`flex items-center gap-1.5 text-xs font-mono font-bold px-2.5 py-1.5 rounded-xl border transition-all ${
                 isOffHours 
-                  ? 'bg-indigo-950 text-indigo-200 border-indigo-700' 
+                  ? 'bg-indigo-950 text-indigo-200 border-indigo-700 shadow-xs' 
                   : isLunch 
-                    ? 'bg-amber-100 text-amber-950 border-amber-300' 
+                    ? 'bg-amber-100 text-amber-950 border-amber-300 shadow-xs' 
                     : 'bg-slate-100 text-slate-700 border-slate-200'
               }`}
               title={
@@ -299,11 +339,11 @@ export const AdminTopBar: React.FC<AdminTopBarProps> = ({
               }
             >
               {isOffHours ? (
-                <span className="text-sm" role="img" aria-label="dormindo">💤</span>
+                <span className="text-sm inline-block animate-bounce drop-shadow-xs" role="img" aria-label="dormindo" title="Fora de Expediente (Modo Ausente)">💤</span>
               ) : isLunch ? (
-                <span className="text-sm" role="img" aria-label="almoco">🍽️</span>
+                <span className="text-sm inline-block animate-pulse duration-700 drop-shadow-xs" role="img" aria-label="almoco" title="Horário de Almoço">🍽️</span>
               ) : (
-                <Clock className="w-3.5 h-3.5 text-[#27431e]" />
+                <Clock className="w-3.5 h-3.5 text-[#27431e] animate-pulse" />
               )}
               <span>{timeStr}</span>
               {isOffHours && (

@@ -73,15 +73,15 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     // Se digitou o nome do cargo (ex: chsecinfo, auxsecinfo, xerifesecinfo, tecinfo)
     if (!matchedUser) {
       if (cleanUser === 'chsecinfo' || cleanUser === 'ch-secinfo') {
-        matchedUser = militaryUsers.find(u => (u.role === 'CH-SECINFO' || u.username === 'dasdeves' || u.username === 'cavalcanti') && u.password === cleanPass) ||
-                      militaryUsers.find(u => u.role === 'CH-SECINFO' && u.username !== 'dev');
+        matchedUser = militaryUsers.find(u => (u.role === 'CH-SECINFO' || u.username === 'dasneves' || u.username === 'dasdeves' || u.username === 'cavalcanti') && u.password === cleanPass) ||
+                      militaryUsers.find(u => u.role === 'CH-SECINFO' && u.username !== 'dev' && !u.name?.toLowerCase().includes('manfrinato'));
       } else if (cleanUser === 'auxsecinfo' || cleanUser === 'aux-secinfo') {
         matchedUser = militaryUsers.find(u => u.role === 'AUX-SECINFO' || u.username === 'castro');
-      } else if (cleanUser === 'xerifesecinfo' || cleanUser === 'xerife' || cleanUser === 'ch-xerifeinfo') {
-        matchedUser = militaryUsers.find(u => u.role === 'CH-XERIFEINFO' || u.username === 'arantes');
-      } else if (cleanUser === 'tecinfo' || cleanUser === 'tecnico' || cleanUser === 'ch-tecnicoinfo') {
-        matchedUser = militaryUsers.find(u => u.role === 'CH-TECNICOINFO' && u.password === cleanPass) ||
-                      militaryUsers.find(u => u.role === 'CH-TECNICOINFO');
+      } else if (cleanUser === 'xerifesecinfo' || cleanUser === 'xerife' || cleanUser === 'inf-xerife' || cleanUser === 'ch-xerifeinfo') {
+        matchedUser = militaryUsers.find(u => (u.role === 'INF-XERIFE' || u.role === 'CH-XERIFEINFO') || u.username === 'arantes');
+      } else if (cleanUser === 'tecinfo' || cleanUser === 'tecnico' || cleanUser === 'inf-tecnico' || cleanUser === 'ch-tecnicoinfo') {
+        matchedUser = militaryUsers.find(u => (u.role === 'INF-TECNICO' || u.role === 'CH-TECNICOINFO') && u.password === cleanPass) ||
+                      militaryUsers.find(u => u.role === 'INF-TECNICO' || u.role === 'CH-TECNICOINFO');
       }
     }
 
@@ -95,22 +95,24 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           name: 'Guilherme Manfrinato',
           rank: 'Dev',
           warName: 'Manfrinato',
-          role: 'CH-SECINFO',
+          role: 'System Developer',
           active: true,
           specialty: 'Desenvolvedor do Sistema & Administrador Geral (Acesso Total)',
+          tags: ['Dev', 'Software', 'Infra', 'Redes', 'Segurança'],
           createdAt: new Date().toISOString(),
         };
-      } else if ((cleanUser === 'dasdeves' || cleanNoSpace === 'dasdeves' || cleanUser === 'chsecinfo') && cleanPass === 'H3b3rt0n2001@') {
+      } else if ((cleanUser === 'dasneves' || cleanNoSpace === 'dasneves' || cleanUser === 'dasdeves' || cleanNoSpace === 'dasdeves' || cleanUser === 'chsecinfo') && cleanPass === 'H3b3rt0n2001@') {
         matchedUser = {
-          id: 'usr-dasdeves',
-          username: 'dasdeves',
+          id: 'usr-dasneves',
+          username: 'dasneves',
           password: cleanPass,
-          name: '3º Sgt Das Deves',
+          name: '3º Sgt Das Neves',
           rank: '3º Sgt',
-          warName: 'Das Deves',
+          warName: 'Das Neves',
           role: 'CH-SECINFO',
           active: true,
           specialty: 'Chefe da Seção de Informática & TI (CHSECINFO)',
+          tags: ['Coordenação', 'Servidores', 'Infra'],
           createdAt: new Date().toISOString(),
         };
       } else if ((cleanUser === 'cavalcanti' || cleanNoSpace === 'cavalcanti' || cleanUser === 'chsecinfo') && cleanPass === 'C4v4lc4nti2620@') {
@@ -124,6 +126,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           role: 'CH-SECINFO',
           active: true,
           specialty: 'Chefe da Seção de Informática & TI (CHSECINFO)',
+          tags: ['Segurança', 'Redes', 'Coordenação'],
           createdAt: new Date().toISOString(),
         };
       } else if ((cleanUser === 'castro' || cleanNoSpace === 'castro' || cleanUser === 'auxsecinfo') && cleanPass === 'Fl59381286789.') {
@@ -137,9 +140,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           role: 'AUX-SECINFO',
           active: true,
           specialty: 'Auxiliar da Seção de Informática (AUXSECINFO)',
+          tags: ['Administrativo', 'Cautelas', 'Hardware'],
           createdAt: new Date().toISOString(),
         };
-      } else if ((cleanUser === 'arantes' || cleanNoSpace === 'arantes' || cleanUser === 'xerifesecinfo') && cleanPass === '4r4nt3s2620@') {
+      } else if ((cleanUser === 'arantes' || cleanNoSpace === 'arantes' || cleanUser === 'xerifesecinfo' || cleanUser === 'inf-xerife') && cleanPass === '4r4nt3s2620@') {
         matchedUser = {
           id: 'usr-arantes',
           username: 'arantes',
@@ -147,9 +151,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           name: 'Sd Arantes',
           rank: 'Sd',
           warName: 'Arantes',
-          role: 'CH-XERIFEINFO',
+          role: 'INF-XERIFE',
           active: true,
-          specialty: 'Xerife do Corpo Técnico (XERIFESECINFO)',
+          specialty: 'Xerife do Corpo Técnico (INF-XERIFE)',
+          tags: ['Infra', 'Redes', 'Hardware'],
           createdAt: new Date().toISOString(),
         };
       } else if ((cleanUser === 'machado' || cleanNoSpace === 'machado') && cleanPass === 'm4ch4d02620@') {
@@ -160,9 +165,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           name: 'Sd Machado',
           rank: 'Sd',
           warName: 'Machado',
-          role: 'CH-TECNICOINFO',
+          role: 'INF-TECNICO',
           active: true,
-          specialty: 'Técnico de Informática (TECINFO)',
+          specialty: 'Técnico de Informática (INF-TECNICO)',
+          tags: ['Hardware', 'Manutenção'],
           createdAt: new Date().toISOString(),
         };
       } else if ((cleanUser === 'oliveira' || cleanNoSpace === 'oliveira') && cleanPass === '0liv3ir42620@') {
@@ -173,9 +179,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           name: 'Sd Oliveira',
           rank: 'Sd',
           warName: 'Oliveira',
-          role: 'CH-TECNICOINFO',
+          role: 'INF-TECNICO',
           active: true,
-          specialty: 'Técnico de Informática (TECINFO)',
+          specialty: 'Técnico de Informática (INF-TECNICO)',
+          tags: ['Redes', 'Telecom'],
           createdAt: new Date().toISOString(),
         };
       } else if ((cleanUser === 'vecchiato' || cleanNoSpace === 'vecchiato') && cleanPass === 'v3cchi4t02620@') {
@@ -186,9 +193,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           name: 'Sd Vecchiato',
           rank: 'Sd',
           warName: 'Vecchiato',
-          role: 'CH-TECNICOINFO',
+          role: 'INF-TECNICO',
           active: true,
-          specialty: 'Técnico de Informática (TECINFO)',
+          specialty: 'Técnico de Informática (INF-TECNICO)',
+          tags: ['Hardware', 'Software'],
           createdAt: new Date().toISOString(),
         };
       } else if (cleanUser === 'tvinfo' && cleanPass === '123') {
@@ -199,7 +207,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
           name: 'Painel TV da Seção',
           rank: 'TI',
           warName: 'Telão Sala TI',
-          role: 'CH-TVINFO',
+          role: 'INF-TV',
           active: true,
           specialty: 'Exibição de Status e Chamados (Sem Interação)',
           createdAt: new Date().toISOString(),
@@ -221,7 +229,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
     }
 
     // 2. Verificar se o login está bloqueado por excesso de tentativas (3 erros) - O login DEV nunca é bloqueado
-    const isDev = matchedUser.username === 'dev' || matchedUser.role === 'dev';
+    const isDev = matchedUser.username === 'dev' || matchedUser.role === 'dev' || matchedUser.role === 'DEV' || matchedUser.role === 'System Developer';
     const userKey = matchedUser.id || matchedUser.username;
     const baseAttempts = Math.max(matchedUser.failedAttempts || 0, localAttempts[userKey] || 0);
     const isLocked = !isDev && Boolean(matchedUser.isLocked || baseAttempts >= 3);
@@ -250,7 +258,17 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
       }
 
       setIsSubmitting(false);
-      onLoginSuccess(matchedUser);
+      const finalUser: MilitaryUser = { ...matchedUser };
+      if (
+        finalUser.username === 'dev' || 
+        finalUser.name?.toLowerCase().includes('manfrinato') || 
+        finalUser.warName?.toLowerCase().includes('manfrinato') || 
+        finalUser.role === 'dev' || 
+        finalUser.role === 'DEV'
+      ) {
+        finalUser.role = 'System Developer';
+      }
+      onLoginSuccess(finalUser);
       return;
     }
 

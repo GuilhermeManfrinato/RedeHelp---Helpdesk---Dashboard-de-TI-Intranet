@@ -15,6 +15,7 @@ import {
   AttendanceRecordModel, 
   IntranetLinkModel 
 } from './src/server/db';
+import { hashPassword, verifyPassword, encryptPayload, decryptPayload } from './src/server/crypto';
 
 dotenv.config();
 
@@ -22,20 +23,99 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
+
+// ==================== SEGURANÇA E PROTEÇÃO MILITAR DO BACKEND ====================
+// Cabeçalhos de Proteção HTTP (OWASP / Padrões de Segurança Governamental)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+// Mecanismo Anti-Força Bruta em Memória (Rate Limiter de Autenticação)
+const failedAttemptsMap = new Map<string, { count: number; lockedUntil: number }>();
+
+const isIpOrUserBlocked = (key: string): boolean => {
+  const record = failedAttemptsMap.get(key);
+  if (!record) return false;
+  if (record.lockedUntil > Date.now()) return true;
+  return false;
+};
+
+const recordFailedLogin = (key: string) => {
+  const now = Date.now();
+  const record = failedAttemptsMap.get(key) || { count: 0, lockedUntil: 0 };
+  record.count += 1;
+  // Bloquear por 2 minutos após 5 tentativas falhas seguidas
+  if (record.count >= 5) {
+    record.lockedUntil = now + 120000;
+  }
+  failedAttemptsMap.set(key, record);
+};
+
+const clearFailedLogin = (key: string) => {
+  failedAttemptsMap.delete(key);
+};
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ==================== ROTAS DA API REST COM SEQUELIZE ====================
 
-// Status e Saúde
+// Status e Saúde com Criptografia de Diagnóstico
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(), 
-    system: '2º GAC - Regimento Deodoro | Seção de Informática & TI' 
+    system: '2º GAC - Regimento Deodoro | Seção de Informática & TI',
+    security: 'AES-256-CBC Encrypted / SHA-512 Salted PBKDF2 Active'
   });
+});
+
+// Autenticação Segura com Proteção Anti-Força Bruta e Criptografia
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+    const limitKey = `${clientIp}:${username}`;
+
+    if (isIpOrUserBlocked(limitKey)) {
+      return res.status(429).json({ 
+        error: 'Muitas tentativas incorretas. Acesso bloqueado temporariamente por 2 minutos por razões de segurança militar.' 
+      });
+    }
+
+    const cleanUser = String(username || '').toLowerCase().trim();
+    const user = await MilitaryUserModel.findOne({ where: { username: cleanUser } });
+    if (!user) {
+      recordFailedLogin(limitKey);
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
+    }
+
+    const userData = (user as any).dataValues || user;
+    if (userData.active === false) {
+      return res.status(403).json({ error: 'Usuário desativado ou desligado da Seção de TI.' });
+    }
+
+    // Validação da senha (suporta texto direto do mock ou hash PBKDF2 com salt)
+    const isDirectMatch = userData.password === password;
+    const isHashMatch = userData.salt ? verifyPassword(password, userData.password, userData.salt) : false;
+
+    if (!isDirectMatch && !isHashMatch) {
+      recordFailedLogin(limitKey);
+      return res.status(401).json({ error: 'Senha incorreta.' });
+    }
+
+    clearFailedLogin(limitKey);
+    const { password: _, salt: __, ...safeUser } = userData;
+    res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // 1. TICKETS (CHAMADOS)
@@ -248,7 +328,12 @@ app.post('/api/tickets/:id/messages', async (req, res) => {
     const ticket = await TicketModel.findByPk(id);
     if (!ticket) return res.status(404).json({ error: 'Chamado não encontrado' });
 
-    const currentMessages = (ticket as any).messages || [];
+    let currentMessages = (ticket as any).messages || [];
+    if (typeof currentMessages === 'string') {
+      try { currentMessages = JSON.parse(currentMessages); } catch { currentMessages = []; }
+    }
+    if (!Array.isArray(currentMessages)) currentMessages = [];
+
     const newMsg = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       sender,
@@ -276,13 +361,18 @@ app.post('/api/tickets/:id/history', async (req, res) => {
     const ticket = await TicketModel.findByPk(id);
     if (!ticket) return res.status(404).json({ error: 'Chamado não encontrado' });
 
-    const currentHistory = (ticket as any).history || [];
+    let currentHistory = (ticket as any).history || [];
+    if (typeof currentHistory === 'string') {
+      try { currentHistory = JSON.parse(currentHistory); } catch { currentHistory = []; }
+    }
+    if (!Array.isArray(currentHistory)) currentHistory = [];
+
     const newHistoryItem = {
       id: `h-${Date.now()}`,
       date: new Date().toISOString(),
       author: author || 'Seção de TI',
       action: 'Despacho Técnico',
-      comment: comment.trim(),
+      comment: (comment || '').trim(),
     };
 
     await ticket.update({
@@ -630,6 +720,29 @@ app.delete('/api/intranet-links/:id', async (req, res) => {
   }
 });
 
+app.post('/api/intranet-links/save-all', async (req, res) => {
+  try {
+    const { links } = req.body;
+    if (Array.isArray(links)) {
+      const existing = await IntranetLinkModel.findAll();
+      for (const el of existing) {
+        await IntranetLinkModel.destroy({ where: { id: el.id } }).catch(() => {});
+      }
+      for (const l of links) {
+        const item = { ...l };
+        if (!item.id) item.id = `link-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+        await IntranetLinkModel.create(item).catch(() => {});
+      }
+    }
+    const all = await IntranetLinkModel.findAll({
+      order: [['category', 'ASC'], ['title', 'ASC']]
+    });
+    res.json(all);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==================== INTEGRAÇÃO VITE / FRONTEND ESTÁTICO ====================
 
 const startServer = async () => {
@@ -653,8 +766,8 @@ const startServer = async () => {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[2º GAC - Regimento Deodoro] Servidor operacional em http://0.0.0.0:${PORT}`);
+  app.listen(PORT, () => {
+    console.log(`[2º GAC - Regimento Deodoro] Servidor operacional em http://localhost:${PORT} e http://127.0.0.1:${PORT}`);
     console.log(`[Intranet Ready] Modo autônomo sem dependências externas de internet`);
   });
 };

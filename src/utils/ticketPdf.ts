@@ -399,7 +399,7 @@ export async function generateTicketPdf(ticket: Ticket, departmentName?: string)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
-  doc.text('3º Sgt DAS DEVES', colRightX + colRightW / 2, curY + 43.5, { align: 'center' });
+  doc.text('3º Sgt DAS NEVES', colRightX + colRightW / 2, curY + 43.5, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);

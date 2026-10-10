@@ -112,12 +112,12 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
   const [linkToDelete, setLinkToDelete] = useState<IntranetLink | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
+  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.role === 'System Developer' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev' || !!(currentUser?.name && currentUser.name.toLowerCase().includes('manfrinato'));
   const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || isDev;
   const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
   // Técnicos NÃO podem adicionar/editar/excluir links; apenas Chefe, Auxiliar e DEV
   const canManageIntranetLinks = isChefe || isAux || isDev;
-  const canSaveDefault = isDev;
+  const canSaveDefault = isChefe || isAux || isDev;
   const [saveDefaultSuccess, setSaveDefaultSuccess] = useState(false);
 
   // Sincronização com o banco de dados (SQLite/MySQL via API) ao abrir o modal
@@ -225,17 +225,22 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
     setLinkToDelete(null);
   };
 
-  const handleSaveAsDefault = () => {
+  const handleSaveAsDefault = async () => {
     try {
       localStorage.setItem('eb_deodoro_intranet_default_links', JSON.stringify(links));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+      await api.saveAllIntranetLinks(links).catch(err => {
+        console.warn('[API] Erro ao salvar abas no banco de dados:', err);
+      });
       setSaveDefaultSuccess(true);
-      setTimeout(() => setSaveDefaultSuccess(false), 3000);
+      setTimeout(() => setSaveDefaultSuccess(false), 3500);
+      alert('Padrão salvo com sucesso! As abas atuais da intranet foram sincronizadas e salvas permanentemente no banco de dados.');
     } catch {
       alert('Erro ao salvar padrão de links.');
     }
   };
 
-  const confirmResetLinks = () => {
+  const confirmResetLinks = async () => {
     let targetDefaults = DEFAULT_INTRANET_LINKS;
     try {
       const savedDefault = localStorage.getItem('eb_deodoro_intranet_default_links');
@@ -247,6 +252,9 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(targetDefaults));
     } catch {}
+    await api.saveAllIntranetLinks(targetDefaults).catch(err => {
+      console.warn('[API] Erro ao sincronizar abas padrão no banco:', err);
+    });
     setShowResetConfirm(false);
   };
 
@@ -507,22 +515,22 @@ export const IntranetModal: React.FC<IntranetModalProps> = ({
               <button
                 type="button"
                 onClick={handleSaveAsDefault}
-                className="text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-300 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                title="Salvar esta lista de links como padrão oficial (Exclusivo DEV)"
+                className="text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-xl border border-amber-300 flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                title="Salvar e definir as abas atuais como o novo padrão permanente no sistema"
               >
-                <span>💾 Salvar Padrão</span>
-                {saveDefaultSuccess && <span className="text-emerald-700">✓ Salvo!</span>}
+                <span>💾 Redefinir / Salvar Padrão</span>
+                {saveDefaultSuccess && <span className="text-emerald-700 font-black">✓ Salvo!</span>}
               </button>
             )}
             {canManageIntranetLinks && (
               <button
                 type="button"
                 onClick={() => setShowResetConfirm(true)}
-                className="text-[11px] font-bold text-slate-500 hover:text-[#192b14] flex items-center gap-1 hover:underline cursor-pointer"
-                title="Restaurar a lista original de links do Regimento"
+                className="text-[11px] font-bold text-slate-600 hover:text-[#192b14] flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
+                title="Restaurar a lista original de links oficiais do Exército"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Restaurar Padrão</span>
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>Restaurar Padrão Original</span>
               </button>
             )}
             <button

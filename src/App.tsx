@@ -63,6 +63,12 @@ import { Lock, Globe, ShieldAlert } from 'lucide-react';
 import { IntranetModal } from './components/IntranetModal';
 import malletBg from './assets/mallet_bg.jpg';
 
+// ============================================================================
+// CHAVE MESTRA DA ESCALA DE SERVIÇO (DUTY ROSTER)
+// Alterne para false caso queira exportar ou compilar o sistema SEM a escala de serviço.
+// ============================================================================
+export const ENABLE_DUTY_ROSTER = true;
+
 interface ErrorBoundaryProps {
   children: ReactNode;
 }
@@ -167,7 +173,19 @@ function AppContent() {
   const [originalUser, setOriginalUser] = useState<MilitaryUser | null>(() => {
     try {
       const raw = sessionStorage.getItem('eb_original_authenticated_user');
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed: MilitaryUser = JSON.parse(raw);
+        if (
+          parsed.username === 'dev' || 
+          parsed.name?.toLowerCase().includes('manfrinato') || 
+          parsed.warName?.toLowerCase().includes('manfrinato') || 
+          parsed.role === 'dev' || 
+          parsed.role === 'DEV'
+        ) {
+          parsed.role = 'System Developer';
+        }
+        return parsed;
+      }
     } catch {}
     return null;
   });
@@ -264,10 +282,13 @@ function AppContent() {
     return unsubscribe;
   }, []);
 
-  // Polling contínuo em background para sincronização em tempo real entre múltiplos dispositivos (PC e Celular)
+  // Polling otimizado em background para sincronização fluida e de alta performance
   useEffect(() => {
     let isMounted = true;
+    let inFlight = false;
     const interval = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const [freshTickets, freshLoans, freshMissions] = await Promise.all([
           api.getTickets().catch(() => null),
@@ -278,32 +299,40 @@ function AppContent() {
 
         if (freshTickets) {
           setTickets(prev => {
-            if (JSON.stringify(prev) !== JSON.stringify(freshTickets)) {
-              return freshTickets;
+            if (prev.length !== freshTickets.length || (freshTickets[0]?.updatedAt !== prev[0]?.updatedAt)) {
+              if (JSON.stringify(prev) !== JSON.stringify(freshTickets)) {
+                return freshTickets;
+              }
             }
             return prev;
           });
         }
         if (freshLoans) {
           setNotebookLoans(prev => {
-            if (JSON.stringify(prev) !== JSON.stringify(freshLoans)) {
-              return freshLoans;
+            if (prev.length !== freshLoans.length || (freshLoans[0]?.status !== prev[0]?.status || freshLoans[0]?.expectedReturnDate !== prev[0]?.expectedReturnDate)) {
+              if (JSON.stringify(prev) !== JSON.stringify(freshLoans)) {
+                return freshLoans;
+              }
             }
             return prev;
           });
         }
         if (freshMissions) {
           setMissions(prev => {
-            if (JSON.stringify(prev) !== JSON.stringify(freshMissions)) {
-              return freshMissions;
+            if (prev.length !== freshMissions.length || (freshMissions[0]?.updatedAt !== prev[0]?.updatedAt)) {
+              if (JSON.stringify(prev) !== JSON.stringify(freshMissions)) {
+                return freshMissions;
+              }
             }
             return prev;
           });
         }
       } catch (err) {
         // Silêncio em falha transitória de polling
+      } finally {
+        inFlight = false;
       }
-    }, 1500);
+    }, 3500);
 
     return () => {
       isMounted = false;
@@ -358,27 +387,37 @@ function AppContent() {
   };
 
   const handleAdminLoginSuccess = (user: MilitaryUser) => {
-    setCurrentUser(user);
-    setOriginalUser(user);
-    sessionStorage.setItem('eb_original_authenticated_user', JSON.stringify(user));
+    const userCopy = { ...user };
+    if (
+      userCopy.username === 'dev' || 
+      userCopy.name?.toLowerCase().includes('manfrinato') || 
+      userCopy.warName?.toLowerCase().includes('manfrinato') || 
+      userCopy.role === 'dev' || 
+      userCopy.role === 'DEV'
+    ) {
+      userCopy.role = 'System Developer';
+    }
+    setCurrentUser(userCopy);
+    setOriginalUser(userCopy);
+    sessionStorage.setItem('eb_original_authenticated_user', JSON.stringify(userCopy));
     setIsAdminAuthenticated(true);
-    saveCurrentUser(user);
+    saveCurrentUser(userCopy);
 
     // Carregar configurações de acessibilidade do usuário se existirem
-    const userA11y = loadUserAccessibilitySettings(user.username);
+    const userA11y = loadUserAccessibilitySettings(userCopy.username);
     if (userA11y) {
       setA11y(userA11y);
     }
 
     handleAddAuditLog({
-      militaryName: user.name,
-      militaryLogin: user.username,
-      role: user.role,
+      militaryName: userCopy.name,
+      militaryLogin: userCopy.username,
+      role: userCopy.role,
       actionType: 'LOGIN_SUCESSO',
-      summary: `Militar autenticou-se no painel da TI com perfil ${user.role}.`,
+      summary: `Militar autenticou-se no painel da TI com perfil ${userCopy.role}.`,
     });
 
-    if (user.role === 'CH-TVINFO') {
+    if (userCopy.role === 'CH-TVINFO') {
       setAdminTab('it');
     }
   };
@@ -407,6 +446,7 @@ function AppContent() {
     category: string;
     departmentId: string;
     requesterName: string;
+    requesterAvatar?: string;
     priority: Priority;
   }): Ticket => {
     const nextCodeNumber = 1000 + tickets.length + 1;
@@ -418,6 +458,7 @@ function AppContent() {
       category: ticketData.category,
       departmentId: ticketData.departmentId,
       requesterName: ticketData.requesterName,
+      requesterAvatar: ticketData.requesterAvatar,
       priority: ticketData.priority,
       status: 'aberto',
       technicianId: null,
@@ -480,7 +521,7 @@ function AppContent() {
     handleAddAuditLog({
       militaryName: currentUser?.name || 'Militar da TI',
       militaryLogin: currentUser?.username || 'ti',
-      role: currentUser?.role || 'CH-TECNICOINFO',
+      role: currentUser?.role || 'INF-TECNICO',
       actionType: 'STATUS_CHAMADO',
       summary: `Moveu o chamado ${ticketTarget?.code || ticketId} para "${newStatus.replace('_', ' ').toUpperCase()}"`,
       details: notes ? `Despacho: ${notes}` : undefined,
@@ -721,7 +762,7 @@ function AppContent() {
 
   const handleAddMissionNote = (missionId: string, noteText: string) => {
     const author = currentUser?.name || 'Militar da TI';
-    const authorRole = currentUser?.role || 'CH-TECNICOINFO';
+    const authorRole = currentUser?.role || 'INF-TECNICO';
     const target = missions.find(m => m.id === missionId);
     const newNote = {
       id: `mn-${Date.now()}`,
@@ -795,7 +836,7 @@ function AppContent() {
     handleAddAuditLog({
       militaryName: currentUser?.name || 'Xerife da TI',
       militaryLogin: currentUser?.username || 'xerife',
-      role: currentUser?.role || 'CH-XERIFEINFO',
+      role: currentUser?.role || 'INF-XERIFE',
       actionType: 'INTERVENCAO_XERIFE',
       summary: `Realizou intervenção geral enviando despacho para ${activeTicketsCount} chamado(s) em aberto`,
       details: `Mensagem: "${message}"`,
@@ -852,7 +893,7 @@ function AppContent() {
       handleAddAuditLog({
         militaryName: currentUser?.name || senderName,
         militaryLogin: currentUser?.username || 'ti',
-        role: currentUser?.role || 'CH-TECNICOINFO',
+        role: currentUser?.role || 'INF-TECNICO',
         actionType: 'MENSAGEM_CHAMADO',
         summary: `Respondeu no chat do chamado ${ticketTarget?.code || ticketId}: "${content.slice(0, 50)}${content.length > 50 ? '...' : ''}"`,
         targetRef: ticketTarget?.code || ticketId,
@@ -917,7 +958,7 @@ function AppContent() {
     handleAddAuditLog({
       militaryName: currentUser?.name || 'Xerife da TI',
       militaryLogin: currentUser?.username || 'xerife',
-      role: currentUser?.role || 'CH-XERIFEINFO',
+      role: currentUser?.role || 'INF-XERIFE',
       actionType: 'ATRIBUIR_TECNICO',
       summary: tech 
         ? `Atribuiu o chamado ${ticketTarget?.code || ticketId} para o técnico ${tech.name}` 
@@ -939,14 +980,17 @@ function AppContent() {
 
     const updatedHistory = [...(ticketTarget?.history || []), newHistoryItem];
 
-    setTickets(prev => prev.map(t => {
+    const updatedTickets = tickets.map(t => {
       if (t.id !== ticketId) return t;
       return {
         ...t,
         updatedAt: new Date().toISOString(),
         history: updatedHistory
       };
-    }));
+    });
+
+    setTickets(updatedTickets);
+    saveTickets(updatedTickets);
 
     api.addTicketHistory(ticketId, comment, author).catch(err => {
       console.warn('[API] Erro ao registrar despacho no banco, tentando fallback:', err);
@@ -956,16 +1000,16 @@ function AppContent() {
     handleAddAuditLog({
       militaryName: currentUser?.name || author,
       militaryLogin: currentUser?.username || 'ti',
-      role: currentUser?.role || 'CH-TECNICOINFO',
+      role: currentUser?.role || 'INF-TECNICO',
       actionType: 'DESPACHO_TECNICO',
       summary: `Adicionou despacho no chamado ${ticketTarget?.code || ticketId}: "${comment.slice(0, 60)}${comment.length > 60 ? '...' : ''}"`,
       targetRef: ticketTarget?.code || ticketId,
     });
   };
 
-  // Handler: Avaliação de atendimento (estrelas)
+  // Handler: Avaliação de atendimento (estrelas) persistindo no banco e storage
   const handleUpdateTicketRating = (ticketId: string, rating: number, comment?: string) => {
-    setTickets(prev => prev.map(t => {
+    const updatedTickets = tickets.map(t => {
       if (t.id !== ticketId) return t;
       return {
         ...t,
@@ -973,7 +1017,13 @@ function AppContent() {
         userFeedback: comment || t.userFeedback,
         updatedAt: new Date().toISOString(),
       };
-    }));
+    });
+    setTickets(updatedTickets);
+    saveTickets(updatedTickets);
+
+    api.updateTicket(ticketId, { rating, userFeedback: comment }).catch(err => {
+      console.warn('[API] Erro ao salvar avaliação no banco:', err);
+    });
   };
 
   // Handler: Cadastrar Nova Cautela de Notebook (Sincronizado com Banco)
@@ -1237,14 +1287,24 @@ function AppContent() {
 
   // Alternar militar na sessão (para testar permissões)
   const handleSwitchUser = (user: MilitaryUser) => {
+    const userCopy = { ...user };
+    if (
+      userCopy.username === 'dev' || 
+      userCopy.name?.toLowerCase().includes('manfrinato') || 
+      userCopy.warName?.toLowerCase().includes('manfrinato') || 
+      userCopy.role === 'dev' || 
+      userCopy.role === 'DEV'
+    ) {
+      userCopy.role = 'System Developer';
+    }
     if (!originalUser && currentUser) {
       setOriginalUser(currentUser);
       sessionStorage.setItem('eb_original_authenticated_user', JSON.stringify(currentUser));
     }
-    setCurrentUser(user);
-    saveCurrentUser(user);
+    setCurrentUser(userCopy);
+    saveCurrentUser(userCopy);
 
-    const userA11y = loadUserAccessibilitySettings(user.username);
+    const userA11y = loadUserAccessibilitySettings(userCopy.username);
     if (userA11y) {
       setA11y(userA11y);
     }
@@ -1317,16 +1377,26 @@ function AppContent() {
                 <button
                   type="button"
                   onClick={() => {
-                    setCurrentUser(originalUser);
-                    saveCurrentUser(originalUser);
+                    const restored = { ...originalUser };
+                    if (
+                      restored.username === 'dev' || 
+                      restored.name?.toLowerCase().includes('manfrinato') || 
+                      restored.warName?.toLowerCase().includes('manfrinato') || 
+                      restored.role === 'dev' || 
+                      restored.role === 'DEV'
+                    ) {
+                      restored.role = 'System Developer';
+                    }
+                    setCurrentUser(restored);
+                    saveCurrentUser(restored);
                     sessionStorage.removeItem('eb_original_authenticated_user');
                     setOriginalUser(null);
-                    const origA11y = loadUserAccessibilitySettings(originalUser.username);
+                    const origA11y = loadUserAccessibilitySettings(restored.username);
                     if (origA11y) setA11y(origA11y);
                   }}
                   className="px-3.5 py-1 bg-[#dfb642] text-[#192b14] hover:bg-yellow-400 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95 shrink-0"
                 >
-                  <span>↩ Voltar para {originalUser.name} ({originalUser.role})</span>
+                  <span>↩ Voltar para {originalUser.name} ({originalUser.username === 'dev' || originalUser.name?.toLowerCase().includes('manfrinato') ? 'System Developer' : originalUser.role})</span>
                 </button>
               </div>
             )}
@@ -1419,13 +1489,14 @@ function AppContent() {
                 />
               )}
 
-              {adminTab === 'duty_roster' && currentUser?.role !== 'CH-TVINFO' && (
+              {ENABLE_DUTY_ROSTER && adminTab === 'duty_roster' && currentUser?.role !== 'CH-TVINFO' && (
                 <DutyRoster
                   currentUser={currentUser}
                   militaryUsers={militaryUsers}
                   technicians={technicians}
                   a11y={a11y}
                   onAddAuditLog={handleAddAuditLog}
+                  onGoBackToDashboard={() => setAdminTab('it')}
                 />
               )}
             </main>
@@ -1438,9 +1509,15 @@ function AppContent() {
             }`}>
               <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                  <span className="font-bold text-[#dfb642]">
+                  <a 
+                    href="http://2gac.eb.mil.br" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="font-bold text-[#dfb642] hover:underline hover:text-yellow-300 transition-colors"
+                    title="Visitar Portal do 2º GAC (Intranet/Internet)"
+                  >
                     2º GAC
-                  </span>
+                  </a>
                   <span>·</span>
                   <span>Seção de Informática & TI</span>
                   <span>·</span>
@@ -1534,9 +1611,15 @@ function AppContent() {
           }`}>
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                <span className="font-bold text-[#dfb642]">
+                <a 
+                  href="http://2gac.eb.mil.br" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="font-bold text-[#dfb642] hover:underline hover:text-yellow-300 transition-colors"
+                  title="Visitar Portal do 2º GAC (Intranet/Internet)"
+                >
                   2º GAC
-                </span>
+                </a>
                 <span>·</span>
                 <span>Seção de Informática & TI</span>
                 <span>·</span>

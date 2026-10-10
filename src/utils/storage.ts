@@ -133,7 +133,16 @@ export const loadDepartments = (): Department[] => {
       localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(initialDepartments));
       return initialDepartments;
     }
-    return JSON.parse(raw);
+    let parsed: Department[] = JSON.parse(raw);
+    const hasOldBia = parsed.some(d => d.id === 'dept-bia');
+    const missingNewBia = initialDepartments.filter(id => !parsed.some(p => p.id === id.id));
+    if (hasOldBia || missingNewBia.length > 0) {
+      parsed = parsed.filter(d => d.id !== 'dept-bia');
+      const merged = [...parsed, ...missingNewBia];
+      localStorage.setItem(STORAGE_KEYS.DEPARTMENTS, JSON.stringify(merged));
+      return merged;
+    }
+    return parsed;
   } catch (e) {
     return initialDepartments;
   }
@@ -154,13 +163,33 @@ export const loadTechnicians = (): Technician[] => {
       localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(initialTechnicians));
       return initialTechnicians;
     }
-    const parsed: Technician[] = JSON.parse(raw);
+    let parsed: Technician[] = JSON.parse(raw);
+    // Migração de Das Deves para Das Neves e preenchimento de tags
+    parsed = parsed.map(t => {
+      if (t.id === 'tech-dasdeves' || t.name.includes('Das Deves')) {
+        return {
+          ...t,
+          id: 'tech-dasneves',
+          name: '3º Sgt Das Neves',
+          email: 'dasneves@eb.mil.br',
+          avatar: t.avatar === 'DD' ? 'DN' : t.avatar,
+          tags: t.tags || ['Coordenação', 'Servidores', 'Infra'],
+        };
+      }
+      const initialMatch = initialTechnicians.find(it => it.id === t.id || it.name === t.name);
+      if (initialMatch && (!t.tags || t.tags.length === 0)) {
+        return { ...t, tags: initialMatch.tags };
+      }
+      return t;
+    });
+
     const missing = initialTechnicians.filter(it => !parsed.some(p => p.id === it.id || p.name === it.name));
     if (missing.length > 0) {
       const merged = [...parsed, ...missing];
       localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(merged));
       return merged;
     }
+    localStorage.setItem(STORAGE_KEYS.TECHNICIANS, JSON.stringify(parsed));
     return parsed;
   } catch (e) {
     return initialTechnicians;
@@ -232,13 +261,66 @@ export const loadMilitaryUsers = (): MilitaryUser[] => {
       localStorage.setItem(STORAGE_KEYS.MILITARY_USERS, JSON.stringify(initialMilitaryUsers));
       return initialMilitaryUsers;
     }
-    const parsed: MilitaryUser[] = JSON.parse(raw);
+    let parsed: MilitaryUser[] = JSON.parse(raw);
+    
+    // Migrações e atualizações automáticas de perfil
+    parsed = parsed.map(u => {
+      let updatedRole = u.role;
+      // Guilherme Manfrinato é estritamente System Developer
+      if (
+        u.username === 'dev' || 
+        u.name?.toLowerCase().includes('manfrinato') || 
+        u.warName?.toLowerCase().includes('manfrinato') ||
+        u.role === 'dev' ||
+        u.role === 'DEV'
+      ) {
+        updatedRole = 'System Developer';
+      } else if (u.role === 'CH-TECNICOINFO' || u.role === 'TECINFO') {
+        updatedRole = 'INF-TECNICO';
+      } else if (u.role === 'CH-XERIFEINFO' || u.role === 'XERIFESECINFO') {
+        updatedRole = 'INF-XERIFE';
+      } else if (u.role === 'CH-TVINFO') {
+        updatedRole = 'INF-TV';
+      } else if (u.role === 'CHSECINFO') {
+        updatedRole = 'CH-SECINFO';
+      } else if (u.role === 'AUXSECINFO') {
+        updatedRole = 'AUX-SECINFO';
+      }
+
+      let updatedName = u.name;
+      let updatedWarName = u.warName;
+      let updatedUsername = u.username;
+      let updatedEmail = u.email;
+
+      // Correção de Das Deves para Das Neves
+      if (u.username === 'dasdeves' || u.warName === 'Das Deves' || u.name.includes('Das Deves')) {
+        updatedName = '3º Sgt Das Neves';
+        updatedWarName = 'Das Neves';
+        updatedUsername = 'dasneves';
+        updatedEmail = 'dasneves@eb.mil.br';
+      }
+
+      const initialMatch = initialMilitaryUsers.find(iu => iu.username === updatedUsername || iu.username === u.username);
+      const tags = (u.tags && u.tags.length > 0) ? u.tags : (initialMatch?.tags || ['Suporte']);
+
+      return {
+        ...u,
+        name: updatedName,
+        warName: updatedWarName,
+        username: updatedUsername,
+        email: updatedEmail,
+        role: updatedRole,
+        tags,
+      };
+    });
+
     const missing = initialMilitaryUsers.filter(iu => !parsed.some(p => p.username === iu.username));
     if (missing.length > 0) {
       const merged = [...parsed, ...missing];
       localStorage.setItem(STORAGE_KEYS.MILITARY_USERS, JSON.stringify(merged));
       return merged;
     }
+    localStorage.setItem(STORAGE_KEYS.MILITARY_USERS, JSON.stringify(parsed));
     return parsed;
   } catch (e) {
     return initialMilitaryUsers;
@@ -289,7 +371,29 @@ export const addAuditLog = (logItem: Omit<SystemAuditLog, 'id' | 'timestamp'>): 
 export const loadCurrentUser = (): MilitaryUser | null => {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed: MilitaryUser = JSON.parse(raw);
+      if (
+        parsed.username === 'dev' || 
+        parsed.name?.toLowerCase().includes('manfrinato') || 
+        parsed.warName?.toLowerCase().includes('manfrinato') || 
+        parsed.role === 'dev' || 
+        parsed.role === 'DEV'
+      ) {
+        parsed.role = 'System Developer';
+      } else if (parsed.role === 'CH-TECNICOINFO' || parsed.role === 'TECINFO') {
+        parsed.role = 'INF-TECNICO';
+      } else if (parsed.role === 'CH-XERIFEINFO' || parsed.role === 'XERIFESECINFO') {
+        parsed.role = 'INF-XERIFE';
+      } else if (parsed.role === 'CH-TVINFO') {
+        parsed.role = 'INF-TV';
+      } else if (parsed.role === 'CHSECINFO') {
+        parsed.role = 'CH-SECINFO';
+      } else if (parsed.role === 'AUXSECINFO') {
+        parsed.role = 'AUX-SECINFO';
+      }
+      return parsed;
+    }
   } catch {}
   return null;
 };
@@ -297,7 +401,17 @@ export const loadCurrentUser = (): MilitaryUser | null => {
 export const saveCurrentUser = (user: MilitaryUser | null) => {
   try {
     if (user) {
-      sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+      const userCopy = { ...user };
+      if (
+        userCopy.username === 'dev' || 
+        userCopy.name?.toLowerCase().includes('manfrinato') || 
+        userCopy.warName?.toLowerCase().includes('manfrinato') || 
+        userCopy.role === 'dev' || 
+        userCopy.role === 'DEV'
+      ) {
+        userCopy.role = 'System Developer';
+      }
+      sessionStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(userCopy));
       sessionStorage.setItem('eb_ti_admin_authenticated', 'true');
     } else {
       sessionStorage.removeItem(STORAGE_KEYS.CURRENT_USER);

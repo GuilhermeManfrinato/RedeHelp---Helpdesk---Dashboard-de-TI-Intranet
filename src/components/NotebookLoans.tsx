@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Laptop, 
   Plus, 
@@ -31,6 +31,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { NotebookLoan, Department, AccessibilitySettings, MilitaryUser, LoanHistoryItem, LoanMessage } from '../types';
+import { loadMilitaryUsers } from '../utils/storage';
 
 interface NotebookLoansProps {
   loans: NotebookLoan[];
@@ -129,7 +130,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
     d.setDate(d.getDate() + 7);
     return d.toISOString().split('T')[0];
   });
-  const [authorizedRole, setAuthorizedRole] = useState(currentUser?.name || '3º Sgt Das Deves (Ch Seç Info)');
+  const [authorizedRole, setAuthorizedRole] = useState(currentUser?.name || '3º Sgt Das Neves (Ch Seç Info)');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
@@ -139,7 +140,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
   const [hasIssues, setHasIssues] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [returnNotes, setReturnNotes] = useState('');
-  const [returnAuthorizedRole, setReturnAuthorizedRole] = useState(currentUser?.name || '3º Sgt Das Deves (Ch Seç Info)');
+  const [returnAuthorizedRole, setReturnAuthorizedRole] = useState(currentUser?.name || '3º Sgt Das Neves (Ch Seç Info)');
   const [returnPassword, setReturnPassword] = useState('');
   const [returnAuthError, setReturnAuthError] = useState('');
 
@@ -151,7 +152,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
     return d.toISOString().split('T')[0];
   });
   const [extensionJustification, setExtensionJustification] = useState('');
-  const [extensionAuthorizedBy, setExtensionAuthorizedBy] = useState(currentUser?.name || '3º Sgt Das Deves');
+  const [extensionAuthorizedBy, setExtensionAuthorizedBy] = useState(currentUser?.name || '3º Sgt Das Neves');
   const [extensionError, setExtensionError] = useState('');
 
   // Modal Chat & Histórico da Cautela
@@ -242,12 +243,44 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
   }, [loanToDelete, editingLoan, quickReturnLoan, showNewModal, activeLoanForReturn, activeLoanForExtension, activeLoanForChat]);
 
   // Permissões militares
-  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'dev' || currentUser?.username === 'dev';
-  const isXerife = currentUser?.role === 'CH-XERIFEINFO';
-  const isTV = currentUser?.role === 'CH-TVINFO';
-  const canManageLoans = Boolean(isChefe || isXerife); // Somente Chefe e Xerife criam ou autorizam novas cautelas
+  const isDev = currentUser?.role === 'System Developer' || currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || !!(currentUser?.name && currentUser.name.toLowerCase().includes('manfrinato'));
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || isDev;
+  const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
+  const isXerife = currentUser?.role === 'INF-XERIFE' || currentUser?.role === 'CH-XERIFEINFO';
+  const isTV = currentUser?.role === 'INF-TV' || currentUser?.role === 'CH-TVINFO';
+  const canManageLoans = Boolean(isChefe || isAux || isXerife); // Chefe, Auxiliar e Xerife criam ou autorizam novas cautelas
   const canDeleteLoans = Boolean(isChefe); // Exclusivo Chefe de Seção
   const canInteract = Boolean(currentUser && !isTV);
+
+  // Lista dinâmica de autorizadores (Chefes, Auxiliares e Devs)
+  const authorizerOptions = useMemo(() => {
+    const list: { value: string; label: string; password?: string }[] = [];
+    try {
+      const allUsers = loadMilitaryUsers();
+      allUsers.forEach(u => {
+        const isUChefe = u.role === 'CH-SECINFO' || u.role === 'CHSECINFO';
+        const isUAux = u.role === 'AUX-SECINFO' || u.role === 'AUXSECINFO';
+        const isUDev = u.role === 'System Developer' || u.role === 'dev' || u.role === 'DEV' || u.username === 'dev' || (u.name && u.name.toLowerCase().includes('manfrinato'));
+        if (isUChefe || isUAux || isUDev) {
+          const roleBadge = isUDev ? '(Dev/Admin)' : isUChefe ? '(Ch Seç Info)' : '(Aux Seç Info)';
+          const label = `${u.name} ${roleBadge}`;
+          if (!list.some(item => item.value === label)) {
+            list.push({ value: label, label, password: u.password });
+          }
+        }
+      });
+    } catch {}
+
+    if (list.length === 0) {
+      list.push(
+        { value: '3º Sgt Das Neves (Ch Seç Info)', label: '3º Sgt Das Neves (Ch Seç Info)', password: 'H3b3rt0n2001@' },
+        { value: '3º Sgt Cavalcanti (Ch Seç Info)', label: '3º Sgt Cavalcanti (Ch Seç Info)', password: 'C4v4lc4nti2620@' },
+        { value: 'Sd Castro (Aux Seç Info)', label: 'Sd Castro (Aux Seç Info)', password: 'Fl59381286789.' },
+        { value: 'Guilherme Manfrinato (Dev/Admin)', label: 'Guilherme Manfrinato (Dev/Admin)', password: 'fT?t7pTpk=0&_H7fW6@info26' }
+      );
+    }
+    return list;
+  }, []);
 
   // Sincronizar activeLoanForChat com o estado mais recente de loans (mensagens em tempo real)
   useEffect(() => {
@@ -393,16 +426,20 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
       return;
     }
 
-    const isValidAuth = authPassword === adminPassword || 
+    const matchedAuthorizer = authorizerOptions.find(opt => opt.password === authPassword);
+    const isCurrentValid = Boolean(currentUser && (isChefe || isAux) && authPassword === currentUser.password);
+    const isValidAuth = 
+      Boolean(matchedAuthorizer) ||
+      isCurrentValid ||
+      authPassword === adminPassword || 
       authPassword === 'admin' || 
-      authPassword === currentUser?.password ||
       authPassword === 'H3b3rt0n2001@' ||
       authPassword === 'C4v4lc4nti2620@' ||
       authPassword === 'Fl59381286789.' ||
       authPassword === 'fT?t7pTpk=0&_H7fW6@info26';
 
     if (!isValidAuth) {
-      setAuthError('Senha de autorização incorreta! Apenas o Chefe ou o Auxiliar da Seção de TI possuem a senha de cautela.');
+      setAuthError('Senha de autorização incorreta! Digite a senha individual de Chefe ou Auxiliar da Seção de TI.');
       return;
     }
 
@@ -414,7 +451,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
       loanDate,
       expectedReturnDate,
       status: 'cautelado',
-      authorizedBy: authorizedRole,
+      authorizedBy: authorizedRole || matchedAuthorizer?.value || currentUser?.name || 'Seção de TI',
     });
 
     setShowNewModal(false);
@@ -432,16 +469,20 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
 
     if (!activeLoanForReturn) return;
 
-    const isValidReturnAuth = returnPassword === adminPassword || 
+    const matchedReturnAuthorizer = authorizerOptions.find(opt => opt.password === returnPassword);
+    const isCurrentReturnValid = Boolean(currentUser && (isChefe || isAux) && returnPassword === currentUser.password);
+    const isValidReturnAuth = 
+      Boolean(matchedReturnAuthorizer) ||
+      isCurrentReturnValid ||
+      returnPassword === adminPassword || 
       returnPassword === 'admin' || 
-      returnPassword === currentUser?.password ||
       returnPassword === 'H3b3rt0n2001@' ||
       returnPassword === 'C4v4lc4nti2620@' ||
       returnPassword === 'Fl59381286789.' ||
       returnPassword === 'fT?t7pTpk=0&_H7fW6@info26';
 
     if (!isValidReturnAuth) {
-      setReturnAuthError('Senha de autorização incorreta! Apenas o Chefe ou o Auxiliar da Seção de TI possuem a senha de descautela.');
+      setReturnAuthError('Senha de autorização incorreta! Digite a senha individual de Chefe ou Auxiliar da Seção de TI.');
       return;
     }
 
@@ -794,6 +835,14 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                 setReturnNotes('');
                 setReturnPassword('');
                 setReturnAuthError('');
+                if (currentUser) {
+                  const formatted = isAux 
+                    ? `${currentUser.name} (Aux Seç Info)`
+                    : isChefe && !isDev 
+                    ? `${currentUser.name} (Ch Seç Info)`
+                    : `${currentUser.name} (Dev/Admin)`;
+                  setReturnAuthorizedRole(formatted);
+                }
               }}
               className="py-1.5 px-2.5 rounded-lg bg-[#27431e] hover:bg-[#1e3316] text-[#dfb642] font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
               title="Receber devolução do notebook"
@@ -841,13 +890,21 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
           </p>
         </div>
 
-        {/* Botão para Nova Cautela (Restrito à chefia de TI) */}
+        {/* Botão para Nova Cautela (Restrito à chefia e auxiliar de TI) */}
         {canManageLoans && (
           <button
             onClick={() => {
               setShowNewModal(true);
               setAuthError('');
               setAuthPassword('');
+              if (currentUser) {
+                const formatted = isAux 
+                  ? `${currentUser.name} (Aux Seç Info)`
+                  : isChefe && !isDev 
+                  ? `${currentUser.name} (Ch Seç Info)`
+                  : `${currentUser.name} (Dev/Admin)`;
+                setAuthorizedRole(formatted);
+              }
             }}
             className="px-5 py-3 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black text-sm flex items-center gap-2 hover:bg-[#27431e] shadow-md transition-all active:scale-[0.99] border border-[#cba135]/50 cursor-pointer"
           >
@@ -1520,7 +1577,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                           baseDate.setDate(baseDate.getDate() + 7);
                           setNewExtensionDate(baseDate.toISOString().split('T')[0]);
                           setExtensionJustification('');
-                          setExtensionAuthorizedBy(currentUser?.name || '3º Sgt Das Deves');
+                          setExtensionAuthorizedBy(currentUser?.name || '3º Sgt Das Neves');
                           setExtensionError('');
                         }}
                         className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs ${
@@ -1546,6 +1603,14 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                           setReturnNotes('');
                           setReturnPassword('');
                           setReturnAuthError('');
+                          if (currentUser) {
+                            const formatted = isAux 
+                              ? `${currentUser.name} (Aux Seç Info)`
+                              : isChefe && !isDev 
+                              ? `${currentUser.name} (Ch Seç Info)`
+                              : `${currentUser.name} (Dev/Admin)`;
+                            setReturnAuthorizedRole(formatted);
+                          }
                         }}
                         className="px-3 py-1.5 rounded-xl bg-[#27431e] text-[#dfb642] font-bold text-xs flex items-center gap-1.5 hover:bg-[#1e3316] shadow-xs transition-colors border border-[#cba135]/40"
                       >
@@ -1842,10 +1907,9 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                       onChange={(e) => setAuthorizedRole(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-[#385e2b] text-xs bg-white font-medium"
                     >
-                      <option value="3º Sgt Das Deves (Ch Seç Info)">3º Sgt Das Deves (Ch Seç Info)</option>
-                      <option value="3º Sgt Cavalcanti (Ch Seç Info)">3º Sgt Cavalcanti (Ch Seç Info)</option>
-                      <option value="Sd Castro (Aux Seç Info)">Sd Castro (Aux Seç Info)</option>
-                      <option value="Guilherme Manfrinato (Dev/Admin)">Guilherme Manfrinato (Dev/Admin)</option>
+                      {authorizerOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1856,7 +1920,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                     <input
                       type="password"
                       required
-                      placeholder="Senha do Chefe/Aux (padrão: admin)"
+                      placeholder="Senha do Chefe ou Auxiliar de TI"
                       value={authPassword}
                       onChange={(e) => setAuthPassword(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-[#385e2b] text-xs bg-white"
@@ -2048,10 +2112,9 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                       onChange={(e) => setReturnAuthorizedRole(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-[#385e2b] text-xs bg-white font-medium"
                     >
-                      <option value="3º Sgt Das Deves (Ch Seç Info)">3º Sgt Das Deves (Ch Seç Info)</option>
-                      <option value="3º Sgt Cavalcanti (Ch Seç Info)">3º Sgt Cavalcanti (Ch Seç Info)</option>
-                      <option value="Sd Castro (Aux Seç Info)">Sd Castro (Aux Seç Info)</option>
-                      <option value="Guilherme Manfrinato (Dev/Admin)">Guilherme Manfrinato (Dev/Admin)</option>
+                      {authorizerOptions.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -2062,7 +2125,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                     <input
                       type="password"
                       required
-                      placeholder="Senha (padrão: admin)"
+                      placeholder="Senha do Chefe ou Auxiliar de TI"
                       value={returnPassword}
                       onChange={(e) => setReturnPassword(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-[#385e2b] text-xs bg-white"
@@ -2306,7 +2369,7 @@ export const NotebookLoans: React.FC<NotebookLoansProps> = ({
                       baseDate.setDate(baseDate.getDate() + 7);
                       setNewExtensionDate(baseDate.toISOString().split('T')[0]);
                       setExtensionJustification('');
-                      setExtensionAuthorizedBy(currentUser?.name || '3º Sgt Das Deves');
+                      setExtensionAuthorizedBy(currentUser?.name || '3º Sgt Das Neves');
                       setExtensionError('');
                     }}
                     className="px-3 py-1.5 rounded-xl bg-[#dfb642] text-[#192b14] font-black text-xs flex items-center gap-1.5 hover:bg-[#cba135] shadow-xs cursor-pointer"

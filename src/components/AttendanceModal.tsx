@@ -83,6 +83,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
   isOpen,
   onClose,
   militaryUsers,
+  technicians = [],
   currentUser,
   a11y,
   onAddAuditLog,
@@ -133,11 +134,12 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
   };
 
   const parseRosterSafe = (roster: any): AttendanceRosterItem[] => {
-    if (Array.isArray(roster)) return roster;
+    if (!roster) return [];
+    if (Array.isArray(roster)) return roster.filter(r => r && typeof r === 'object');
     if (typeof roster === 'string') {
       try {
         const parsed = JSON.parse(roster);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return parsed.filter(r => r && typeof r === 'object');
       } catch {}
     }
     return [];
@@ -146,38 +148,40 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
   // Inicializar o roster quando abre
   useEffect(() => {
     if (isOpen) {
-      const activeUsers = (militaryUsers || []).filter(u => u && u.active !== false && u.username !== 'dev' && u.role !== 'dev');
+      let activeUsers = (militaryUsers || []).filter(u => u && u.active !== false && u.username !== 'dev' && u.role !== 'dev' && u.role !== 'System Developer');
+      if (activeUsers.length === 0 && Array.isArray(technicians) && technicians.length > 0) {
+        activeUsers = (technicians as any[]).filter(t => t && t.active !== false && t.id !== 'tech-dev');
+      }
       const initialRoster: AttendanceRosterItem[] = activeUsers.map(u => ({
         militaryId: u.id || `mil-${Math.random()}`,
         militaryName: u.name || 'Militar',
         warName: u.warName || u.name || 'Militar',
-        rank: u.rank || 'Mil',
+        rank: u.rank || (u.name?.startsWith('3º Sgt') ? '3º Sgt' : 'Sd'),
         status: 'PRESENTE',
         reason: '',
       }));
       setRoster(initialRoster);
       loadRecords();
     }
-  }, [isOpen, militaryUsers]);
+  }, [isOpen, militaryUsers, technicians]);
 
   const loadRecords = async () => {
     try {
       const data = await api.getAttendanceRecords();
       if (Array.isArray(data) && data.length > 0) {
-        setRecords(data);
-        saveAttendanceRecords(data);
+        const clean = data.filter(r => r && typeof r === 'object');
+        setRecords(clean);
+        saveAttendanceRecords(clean);
       } else {
-        const local = loadAttendanceRecords();
+        const local = (loadAttendanceRecords() || []).filter(r => r && typeof r === 'object');
         setRecords(local);
       }
     } catch (err) {
       console.warn('[AttendanceModal] Falha ao carregar registros do backend, usando local:', err);
-      const local = loadAttendanceRecords();
+      const local = (loadAttendanceRecords() || []).filter(r => r && typeof r === 'object');
       setRecords(local);
     }
   };
-
-  if (!isOpen) return null;
 
   const handleStatusChange = (militaryId: string, status: AttendanceStatus) => {
     setRoster(prev => prev.map(item => item.militaryId === militaryId ? { ...item, status } : item));
@@ -191,8 +195,8 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
     setRoster(prev => prev.map(item => ({ ...item, status: 'PRESENTE', reason: '' })));
   };
 
-  const countPresent = roster.filter(i => i.status === 'PRESENTE').length;
-  const countAbsent = roster.filter(i => i.status !== 'PRESENTE').length;
+  const countPresent = roster.filter(i => i && i.status === 'PRESENTE').length;
+  const countAbsent = roster.filter(i => i && i.status !== 'PRESENTE').length;
   const totalStrength = roster.length;
   const presencePct = totalStrength > 0 ? Math.round((countPresent / totalStrength) * 100) : 100;
 
@@ -266,9 +270,12 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
   }, [isOpen, onClose]);
 
   const filteredHistoryRecords = (Array.isArray(records) ? records : []).filter(r => {
+    if (!r || typeof r !== 'object') return false;
     if (queryDate && r.date !== queryDate) return false;
     return true;
   });
+
+  if (!isOpen) return null;
 
   return (
     <div 
@@ -575,7 +582,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
               ) : (
                 filteredHistoryRecords.map((record) => (
                   <div
-                    key={record.id}
+                    key={record.id || `rec-${Math.random()}`}
                     className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-[#27431e] shadow-xs space-y-3 transition-all"
                   >
                     {/* Cabeçalho do Registro */}
@@ -585,15 +592,15 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
                           {formatDateSafe(record.date)} · {record.time || ''}
                         </span>
                         <span className="font-bold text-xs text-slate-900">
-                          {record.shift}
+                          {record.shift || 'Formatura'}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                          {record.totalPresent}/{record.totalStrength} Presentes ({record.totalStrength > 0 ? Math.round((record.totalPresent / record.totalStrength) * 100) : 100}%)
+                          {record.totalPresent ?? 0}/{record.totalStrength ?? 0} Presentes ({(record.totalStrength || 0) > 0 ? Math.round(((record.totalPresent || 0) / record.totalStrength) * 100) : 100}%)
                         </span>
-                        {record.totalAbsent > 0 && (
+                        {(record.totalAbsent || 0) > 0 && (
                           <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-red-100 text-red-900 border border-red-300">
                             {record.totalAbsent} Falta(s)
                           </span>
@@ -605,7 +612,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({
                     <div className="text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <span>Oficial/Sargento Responsável: </span>
-                        <strong className="text-slate-900">{record.supervisorName} ({record.supervisorRole})</strong>
+                        <strong className="text-slate-900">{record.supervisorName || 'Chefe da TI'} ({record.supervisorRole || 'CH-SECINFO'})</strong>
                       </div>
                       {record.notes && (
                         <div className="italic text-slate-500">

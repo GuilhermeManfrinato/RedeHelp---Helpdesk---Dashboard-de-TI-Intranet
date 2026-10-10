@@ -27,7 +27,9 @@ import {
   FileText,
   ShieldAlert,
   Calendar,
-  Printer
+  Printer,
+  Camera,
+  Tag
 } from 'lucide-react';
 import { 
   Technician, 
@@ -64,63 +66,138 @@ const RANKS = [
   'TI (Civil/Painel)'
 ];
 
-const AVAILABLE_ROLES: UserRole[] = [
-  'CH-SECINFO',
-  'AUX-SECINFO',
-  'CH-XERIFEINFO',
-  'CH-TECNICOINFO',
-  'CH-TVINFO'
+export const MILITARY_SKILL_TAGS = [
+  'Redes',
+  'Infraestrutura',
+  'Software',
+  'Dev',
+  'Hardware',
+  'Segurança',
+  'Telecom',
+  'Servidores',
+  'Suporte',
+  'Manutenção',
+  'Sistemas EB'
 ];
 
+const AVAILABLE_ROLES: UserRole[] = [
+  'System Developer',
+  'CH-SECINFO',
+  'AUX-SECINFO',
+  'INF-XERIFE',
+  'INF-TECNICO',
+  'INF-TV'
+];
+
+const normalizeRole = (role: string, username?: string, name?: string): UserRole => {
+  if (
+    username === 'dev' || 
+    name?.toLowerCase().includes('manfrinato') || 
+    role === 'dev' || 
+    role === 'DEV' || 
+    role === 'System Developer'
+  ) {
+    return 'System Developer';
+  }
+  if (role === 'CH-TECNICOINFO' || role === 'TECINFO') return 'INF-TECNICO';
+  if (role === 'CH-XERIFEINFO' || role === 'XERIFESECINFO') return 'INF-XERIFE';
+  if (role === 'CH-TVINFO') return 'INF-TV';
+  if (role === 'CHSECINFO') return 'CH-SECINFO';
+  if (role === 'AUXSECINFO') return 'AUX-SECINFO';
+  return role as UserRole;
+};
+
 const ROLES_INFO: Record<string, { title: string; desc: string; badgeBg: string; textCol: string; borderCol: string }> = {
+  'System Developer': {
+    title: 'Desenvolvedor do Sistema',
+    desc: 'Criador e desenvolvedor oficial do sistema. Acesso irrestrito a todos os módulos, configurações de escala, banco de dados e auditoria militar.',
+    badgeBg: 'bg-purple-100 text-purple-900 border-purple-300',
+    textCol: 'text-purple-700',
+    borderCol: 'border-purple-400'
+  },
+  'dev': {
+    title: 'Desenvolvedor do Sistema',
+    desc: 'Criador e desenvolvedor oficial do sistema. Acesso irrestrito a todos os módulos.',
+    badgeBg: 'bg-purple-100 text-purple-900 border-purple-300',
+    textCol: 'text-purple-700',
+    borderCol: 'border-purple-400'
+  },
   'CH-SECINFO': {
-    title: 'Chefe da Seção de TI (CHSECINFO)',
-    desc: 'Acesso irrestrito a todo o sistema, cautelas, chamados, logs, exclusões e gerenciamento de usuários.',
+    title: 'Chefe da Seção de TI',
+    desc: 'Acesso total a todo o sistema, cautelas, chamados, logs de auditoria, exclusões e gerenciamento de usuários da guarnição.',
+    badgeBg: 'bg-amber-100 text-amber-900 border-amber-300',
+    textCol: 'text-amber-700',
+    borderCol: 'border-amber-400'
+  },
+  'CHSECINFO': {
+    title: 'Chefe da Seção de TI',
+    desc: 'Acesso total a todo o sistema, cautelas, chamados, logs de auditoria, exclusões e gerenciamento de usuários da guarnição.',
     badgeBg: 'bg-amber-100 text-amber-900 border-amber-300',
     textCol: 'text-amber-700',
     borderCol: 'border-amber-400'
   },
   'AUX-SECINFO': {
-    title: 'Auxiliar da Seção de TI (AUXSECINFO)',
-    desc: 'Gestão de cautelas, acompanhamento da fila de chamados, controle de presenças e apoio administrativo da Seção.',
+    title: 'Auxiliar da Seção de TI',
+    desc: 'Gestão de cautelas, acompanhamento da fila de chamados, controle de presenças e apoio administrativo da Seção de TI.',
     badgeBg: 'bg-teal-100 text-teal-900 border-teal-300',
     textCol: 'text-teal-700',
     borderCol: 'border-teal-400'
   },
   'AUXSECINFO': {
-    title: 'Auxiliar da Seção de TI (AUXSECINFO)',
-    desc: 'Gestão de cautelas, acompanhamento da fila de chamados, controle de presenças e apoio administrativo da Seção.',
+    title: 'Auxiliar da Seção de TI',
+    desc: 'Gestão de cautelas, acompanhamento da fila de chamados, controle de presenças e apoio administrativo da Seção de TI.',
     badgeBg: 'bg-teal-100 text-teal-900 border-teal-300',
     textCol: 'text-teal-700',
     borderCol: 'border-teal-400'
   },
+  'INF-XERIFE': {
+    title: 'Xerife do Corpo Técnico',
+    desc: 'Triagem operacional, atribuição de militares nos chamados, intervenção em massa, edição de prioridades e nomes de chamados. Não exclui chamados.',
+    badgeBg: 'bg-blue-100 text-blue-900 border-blue-300',
+    textCol: 'text-blue-700',
+    borderCol: 'border-blue-400'
+  },
   'CH-XERIFEINFO': {
-    title: 'Xerife do Corpo Técnico (XERIFESECINFO)',
+    title: 'Xerife do Corpo Técnico',
     desc: 'Triagem operacional, atribuição de militares nos chamados, intervenção em massa, edição de prioridades e nomes de chamados. Não exclui chamados.',
     badgeBg: 'bg-blue-100 text-blue-900 border-blue-300',
     textCol: 'text-blue-700',
     borderCol: 'border-blue-400'
   },
   'XERIFESECINFO': {
-    title: 'Xerife do Corpo Técnico (XERIFESECINFO)',
+    title: 'Xerife do Corpo Técnico',
     desc: 'Triagem operacional, atribuição de militares nos chamados, intervenção em massa, edição de prioridades e nomes de chamados. Não exclui chamados.',
     badgeBg: 'bg-blue-100 text-blue-900 border-blue-300',
     textCol: 'text-blue-700',
     borderCol: 'border-blue-400'
   },
+  'INF-TECNICO': {
+    title: 'Técnico de Atendimento',
+    desc: 'Liberado consultar chamados, responder dúvidas dos solicitantes, registrar despachos técnicos e movimentar blocos de status.',
+    badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+    textCol: 'text-emerald-700',
+    borderCol: 'border-emerald-400'
+  },
   'CH-TECNICOINFO': {
-    title: 'Técnico de Atendimento (TECINFO)',
-    desc: 'Liberado consultar chamados, responder dúvidas dos solicitantes e movimentar blocos de status.',
+    title: 'Técnico de Atendimento',
+    desc: 'Liberado consultar chamados, responder dúvidas dos solicitantes, registrar despachos técnicos e movimentar blocos de status.',
     badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
     textCol: 'text-emerald-700',
     borderCol: 'border-emerald-400'
   },
   'TECINFO': {
-    title: 'Técnico de Atendimento (TECINFO)',
-    desc: 'Liberado consultar chamados, responder dúvidas dos solicitantes e movimentar blocos de status.',
+    title: 'Técnico de Atendimento',
+    desc: 'Liberado consultar chamados, responder dúvidas dos solicitantes, registrar despachos técnicos e movimentar blocos de status.',
     badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
     textCol: 'text-emerald-700',
     borderCol: 'border-emerald-400'
+  },
+  'INF-TV': {
+    title: 'Painel TV (Telão da Seção)',
+    desc: 'Exibição pública em tela grande com auto-scroll. Somente visualização dos chamados, sem nenhuma interação.',
+    badgeBg: 'bg-purple-100 text-purple-900 border-purple-300',
+    textCol: 'text-purple-700',
+    borderCol: 'border-purple-400'
   },
   'CH-TVINFO': {
     title: 'Painel TV (Telão da Seção)',
@@ -146,9 +223,10 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
   const [activeTab, setActiveTab] = useState<'users' | 'audit'>('users');
 
   // Permissões do usuário atual
-  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'dev' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
+  const isDev = currentUser?.role === 'System Developer' || currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
+  const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || isDev;
   const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
-  const isXerife = currentUser?.role === 'CH-XERIFEINFO';
+  const isXerife = currentUser?.role === 'INF-XERIFE' || currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO';
   const canManageUsers = isChefe || isAux || isXerife;
 
   // Estados do Modal de Criação de Militar (Login/Senha)
@@ -157,9 +235,11 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
   const [warName, setWarName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('CH-TECNICOINFO');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('INF-TECNICO');
   const [email, setEmail] = useState('');
   const [specialty, setSpecialty] = useState('Manutenção de Hardware e Suporte de Rede');
+  const [userAvatar, setUserAvatar] = useState('');
+  const [userTags, setUserTags] = useState<string[]>(['Hardware', 'Suporte']);
   const [userError, setUserError] = useState('');
 
   // Estados do Modal de Alteração de Credenciais (Login e Senha)
@@ -168,12 +248,33 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
   const [editPassword, setEditPassword] = useState('');
   const [editRank, setEditRank] = useState('3º Sgt');
   const [editWarName, setEditWarName] = useState('');
-  const [editRole, setEditRole] = useState<UserRole>('CH-TECNICOINFO');
+  const [editRole, setEditRole] = useState<UserRole>('INF-TECNICO');
   const [editSpecialty, setEditSpecialty] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [editUnlockChecked, setEditUnlockChecked] = useState(false);
   const [showEditPasswordText, setShowEditPasswordText] = useState(false);
   const [editCredsError, setEditCredsError] = useState('');
+
+  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A foto deve ter no máximo 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      if (isEdit) {
+        setEditAvatar(base64);
+      } else {
+        setUserAvatar(base64);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Estados do Modal de Desligamento / Afastamento de Militar
   const [deactivatingUser, setDeactivatingUser] = useState<MilitaryUser | null>(null);
@@ -205,6 +306,41 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showAddUserModal, editingCredsUser, deactivatingUser, unlockTargetUser]);
+
+  // Estado do seletor rápido de tags por militar
+  const [tagPickerUserId, setTagPickerUserId] = useState<string | null>(null);
+
+  const handleToggleTag = (user: MilitaryUser, tagToToggle: string) => {
+    const currentTags = user.tags || [];
+    const newTags = currentTags.includes(tagToToggle)
+      ? currentTags.filter(t => t !== tagToToggle)
+      : [...currentTags, tagToToggle];
+
+    const updatedUser: MilitaryUser = {
+      ...user,
+      tags: newTags,
+    };
+
+    onUpdateMilitaryUsers(
+      militaryUsers.map(u => u.id === user.id ? updatedUser : u)
+    );
+
+    onUpdateTechnicians(
+      technicians.map(t => (t.id === user.id || t.email === user.email || t.name === user.name)
+        ? { ...t, tags: newTags }
+        : t
+      )
+    );
+
+    onAddAuditLog({
+      militaryName: currentUser?.name || 'Administrador',
+      militaryLogin: currentUser?.username || 'admin',
+      role: currentUser?.role || 'CH-SECINFO',
+      actionType: 'USUARIO_EDITADO',
+      summary: `Atualizou etiquetas técnicas de ${user.name}: ${newTags.length > 0 ? newTags.join(', ') : 'Nenhuma tag'}`,
+      targetRef: user.username,
+    });
+  };
 
   // Criação de Novo Militar com Login & Senha
   const handleCreateMilitaryUser = (e: React.FormEvent) => {
@@ -245,6 +381,8 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
       active: true,
       email: email.trim() || `${cleanUsername}@eb.mil.br`,
       specialty: specialty.trim() || 'Informática e Suporte Operacional',
+      tags: userTags,
+      avatar: userAvatar || undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -257,21 +395,22 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
       role: currentUser?.role || 'CH-SECINFO',
       actionType: 'USUARIO_CRIADO',
       summary: `Cadastrou o militar ${fullName} com login "${cleanUsername}" e perfil ${selectedRole}`,
-      details: `Função: ${ROLES_INFO[selectedRole].title} | Especialidade: ${newUser.specialty}`,
+      details: `Função: ${ROLES_INFO[selectedRole]?.title || selectedRole} | Especialidade: ${newUser.specialty} | Tags: ${userTags.join(', ')}`,
       targetRef: cleanUsername,
     });
 
     // Se for técnico ou xerife, cadastra também na lista de bancada se não existir
-    if (selectedRole !== 'CH-TVINFO' && !technicians.some(t => t.name.toLowerCase() === fullName.toLowerCase())) {
+    if (selectedRole !== 'INF-TV' && selectedRole !== 'CH-TVINFO' && !technicians.some(t => t.name.toLowerCase() === fullName.toLowerCase())) {
       const initials = (selectedRank.split(' ')[0][0] + cleanWarName[0]).toUpperCase();
       const newTech: Technician = {
         id: `tech-${Date.now()}`,
         name: fullName,
-        role: ROLES_INFO[selectedRole].title,
+        role: ROLES_INFO[selectedRole]?.title || selectedRole,
         email: newUser.email || `${cleanUsername}@eb.mil.br`,
-        avatar: initials,
+        avatar: userAvatar || initials,
         active: true,
         specialty: newUser.specialty || 'Suporte Técnico',
+        tags: userTags,
       };
       onUpdateTechnicians([...technicians, newTech]);
     }
@@ -281,6 +420,8 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
     setUsername('');
     setPassword('');
     setEmail('');
+    setUserAvatar('');
+    setUserTags(['Hardware', 'Suporte']);
   };
 
   // Abrir Modal de Edição Completa de Login/Senha e Dados
@@ -293,6 +434,8 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
     setEditRole(u.role);
     setEditSpecialty(u.specialty || '');
     setEditEmail(u.email || '');
+    setEditAvatar(u.avatar || '');
+    setEditTags(u.tags && u.tags.length > 0 ? u.tags : ['Hardware', 'Suporte']);
     setEditUnlockChecked(Boolean(u.isLocked || (u.failedAttempts && u.failedAttempts >= 3)));
     setShowEditPasswordText(false);
     setEditCredsError('');
@@ -344,6 +487,8 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
       role: editRole,
       specialty: editSpecialty.trim() || editingCredsUser.specialty,
       email: editEmail.trim() || `${cleanUser}@eb.mil.br`,
+      avatar: editAvatar || editingCredsUser.avatar,
+      tags: editTags,
       isLocked: shouldUnlock ? false : editingCredsUser.isLocked,
       failedAttempts: shouldUnlock ? 0 : (editingCredsUser.failedAttempts || 0),
       lockedAt: shouldUnlock ? undefined : editingCredsUser.lockedAt,
@@ -351,6 +496,22 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
 
     onUpdateMilitaryUsers(
       militaryUsers.map(u => u.id === editingCredsUser.id ? updatedUser : u)
+    );
+
+    // Atualiza também na lista de bancada de técnicos se existir
+    onUpdateTechnicians(
+      technicians.map(t => (t.id === editingCredsUser.id || t.email === editingCredsUser.email || t.name === editingCredsUser.name)
+        ? {
+            ...t,
+            name: fullName,
+            email: updatedUser.email || t.email,
+            avatar: updatedUser.avatar || t.avatar,
+            role: ROLES_INFO[editRole]?.title || t.role,
+            specialty: updatedUser.specialty || t.specialty,
+            tags: editTags,
+          }
+        : t
+      )
     );
 
     api.updateMilitaryUser(editingCredsUser.id, updatedUser).catch(console.warn);
@@ -361,7 +522,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
       role: currentUser?.role || 'CH-SECINFO',
       actionType: 'USUARIO_EDITADO',
       summary: `Atualizou login/senha e credenciais do militar ${fullName} (${cleanUser})`,
-      details: `Perfil: ${editRole} | Bloqueio de tentativas: ${shouldUnlock ? 'Liberado/Zerado' : 'Mantido'}`,
+      details: `Perfil: ${editRole} | Tags: ${editTags.join(', ')} | Bloqueio de tentativas: ${shouldUnlock ? 'Liberado/Zerado' : 'Mantido'}`,
       targetRef: cleanUser,
     });
 
@@ -652,7 +813,8 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
             {visibleMilitaryUsers.map((user) => {
-              const roleMeta = ROLES_INFO[user.role] || ROLES_INFO['CH-TECNICOINFO'];
+              const cleanRole = normalizeRole(user.role, user.username, user.name);
+              const roleMeta = ROLES_INFO[cleanRole] || ROLES_INFO['INF-TECNICO'];
               const isLogged = currentUser?.id === user.id;
               const isUserLocked = Boolean(user.isLocked || (user.failedAttempts && user.failedAttempts >= 3));
 
@@ -671,8 +833,12 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
 
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black text-sm flex items-center justify-center border border-[#cba135]/40 shadow-xs shrink-0">
-                        {user.warName.slice(0, 2).toUpperCase()}
+                      <div className="w-12 h-12 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black text-sm flex items-center justify-center border border-[#cba135]/40 shadow-xs shrink-0 overflow-hidden">
+                        {user.avatar ? (
+                          <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                          user.warName.slice(0, 2).toUpperCase()
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -681,7 +847,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                           </h3>
                         </div>
                         <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-md text-[11px] font-mono font-black border ${roleMeta.badgeBg}`}>
-                          {user.role} · {roleMeta.title}
+                          {cleanRole} · {roleMeta.title}
                         </span>
                       </div>
                     </div>
@@ -778,10 +944,10 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                           type="button"
                           onClick={() => openEditCredentials(user)}
                           className="px-3 py-1.5 rounded-xl bg-[#1e3316] text-[#dfb642] hover:bg-[#27431e] font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs border border-[#cba135]/40"
-                          title="Alterar Login e Senha deste militar"
+                          title="Alterar login, senha e permissões deste militar"
                         >
                           <KeyRound className="w-3.5 h-3.5" />
-                          <span>Alterar Login / Senha</span>
+                          <span>Editar Perfil & Senha</span>
                         </button>
 
                         {Boolean(user.isLocked || (user.failedAttempts && user.failedAttempts >= 3)) && (
@@ -803,6 +969,76 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                       <div className="flex items-center gap-2">
                         <Mail className="w-3.5 h-3.5 text-[#27431e] shrink-0" />
                         <span className="truncate"><strong>E-mail:</strong> {user.email}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tags de Especialidade / Competências Interativas */}
+                  <div className="pt-1 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-slate-700 flex items-center gap-1">
+                        <Tag className="w-3.5 h-3.5 text-[#27431e]" />
+                        <span>Competências Técnicas:</span>
+                      </span>
+                      {canManageUsers && (
+                        <button
+                          type="button"
+                          onClick={() => setTagPickerUserId(tagPickerUserId === user.id ? null : user.id)}
+                          className="text-[10px] text-[#1e3316] font-bold hover:underline flex items-center gap-1 cursor-pointer bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+                        >
+                          <span>{tagPickerUserId === user.id ? 'Fechar' : '+ Gerenciar Tags'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.tags && user.tags.length > 0 ? (
+                        user.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#1e3316]/10 text-[#1e3316] border border-[#27431e]/20 flex items-center gap-1"
+                          >
+                            <span>#{tag}</span>
+                            {canManageUsers && tagPickerUserId === user.id && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleTag(user, tag)}
+                                className="text-red-500 hover:text-red-700 ml-0.5 cursor-pointer font-black"
+                                title={`Remover tag #${tag}`}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">Nenhuma etiqueta atribuída</span>
+                      )}
+                    </div>
+
+                    {/* Seletor Rápido de Tags quando expandido */}
+                    {canManageUsers && tagPickerUserId === user.id && (
+                      <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-300 space-y-1.5 animate-in fade-in">
+                        <span className="text-[10px] text-slate-600 font-bold block">Clique para adicionar/remover tags de {user.warName}:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {MILITARY_SKILL_TAGS.map((tag) => {
+                            const isSelected = (user.tags || []).includes(tag);
+                            return (
+                              <button
+                                type="button"
+                                key={tag}
+                                onClick={() => handleToggleTag(user, tag)}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-[#1e3316] text-[#dfb642] border-[#1e3316] shadow-2xs'
+                                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-200'
+                                }`}
+                              >
+                                {isSelected ? '✓ ' : '+ '}#{tag}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -960,7 +1196,8 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                     </tr>
                   ) : (
                     filteredLogs.map((log) => {
-                      const roleMeta = ROLES_INFO[log.role] || ROLES_INFO['CH-TECNICOINFO'];
+                      const cleanLogRole = normalizeRole(log.role, log.militaryLogin, log.militaryName);
+                      const roleMeta = ROLES_INFO[cleanLogRole] || ROLES_INFO['INF-TECNICO'];
                       const isProrrogacao = log.actionType === 'PRORROGACAO_CAUTELA';
                       const isIntervencao = log.actionType === 'INTERVENCAO_XERIFE';
                       const isExclusao = log.actionType === 'EXCLUSAO_CHAMADO';
@@ -986,7 +1223,7 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                           {/* Role */}
                           <td className="py-3 px-4 whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${roleMeta.badgeBg}`}>
-                              {log.role}
+                              {cleanLogRole}
                             </span>
                           </td>
 
@@ -1198,6 +1435,79 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
                   />
+                </div>
+              </div>
+
+              {/* Foto do Militar & Tags de Competências */}
+              <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div>
+                  <label className="block font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-[#27431e]" />
+                    <span>Foto de Identificação do Militar:</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black flex items-center justify-center border border-[#cba135]/40 overflow-hidden shrink-0 shadow-inner">
+                      {userAvatar ? (
+                        <img src={userAvatar} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-6 h-6 opacity-60" />
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="px-3 py-1.5 rounded-xl bg-white border border-slate-300 hover:border-[#27431e] font-bold text-xs text-slate-700 cursor-pointer shadow-2xs inline-block">
+                        <span>Escolher Arquivo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleAvatarFileUpload(e, false)}
+                        />
+                      </label>
+                      {userAvatar && (
+                        <button
+                          type="button"
+                          onClick={() => setUserAvatar('')}
+                          className="text-[11px] text-red-600 hover:underline block font-semibold cursor-pointer"
+                        >
+                          Remover foto
+                        </button>
+                      )}
+                      <p className="text-[10px] text-slate-400">JPG, PNG ou WebP (Máx. 2MB)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-[#27431e]" />
+                    <span>Tags de Especialidade / Competência Técnica:</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500 mb-2">Selecione as áreas de destaque do militar para rápida identificação e atribuição de chamados:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MILITARY_SKILL_TAGS.map((tag) => {
+                      const isSelected = userTags.includes(tag);
+                      return (
+                        <button
+                          type="button"
+                          key={tag}
+                          onClick={() => {
+                            if (isSelected) {
+                              setUserTags(userTags.filter(t => t !== tag));
+                            } else {
+                              setUserTags([...userTags, tag]);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#1e3316] text-[#dfb642] border-[#1e3316]'
+                              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          #{tag}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -1425,6 +1735,79 @@ export const TechniciansManager: React.FC<TechniciansManagerProps> = ({
                     placeholder="Ex: militar@eb.mil.br"
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
                   />
+                </div>
+              </div>
+
+              {/* Foto do Militar & Tags no Editar Credenciais */}
+              <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div>
+                  <label className="block font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-[#27431e]" />
+                    <span>Foto de Identificação do Militar:</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black flex items-center justify-center border border-[#cba135]/40 overflow-hidden shrink-0 shadow-inner">
+                      {editAvatar ? (
+                        <img src={editAvatar} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-6 h-6 opacity-60" />
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-300 hover:border-[#27431e] font-bold text-xs text-slate-700 cursor-pointer shadow-2xs inline-block">
+                        <span>Escolher Arquivo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleAvatarFileUpload(e, true)}
+                        />
+                      </label>
+                      {editAvatar && (
+                        <button
+                          type="button"
+                          onClick={() => setEditAvatar('')}
+                          className="text-[11px] text-red-600 hover:underline block font-semibold cursor-pointer"
+                        >
+                          Remover foto
+                        </button>
+                      )}
+                      <p className="text-[10px] text-slate-400">JPG, PNG ou WebP (Máx. 2MB)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-[#27431e]" />
+                    <span>Tags de Especialidade / Competência Técnica:</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500 mb-2">Selecione as áreas de destaque do militar:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MILITARY_SKILL_TAGS.map((tag) => {
+                      const isSelected = editTags.includes(tag);
+                      return (
+                        <button
+                          type="button"
+                          key={tag}
+                          onClick={() => {
+                            if (isSelected) {
+                              setEditTags(editTags.filter(t => t !== tag));
+                            } else {
+                              setEditTags([...editTags, tag]);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#1e3316] text-[#dfb642] border-[#1e3316]'
+                              : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                          }`}
+                        >
+                          #{tag}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

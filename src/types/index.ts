@@ -28,6 +28,7 @@ export interface Ticket {
   priority: Priority;
   status: TicketStatus;
   requesterName: string; // Posto/Graduação e Nome de Guerra (ex: 1º Ten Silva, Sgt Mendes)
+  requesterAvatar?: string; // Foto ou avatar do militar solicitante
   departmentId: string; // Seção da OM (1ª Seç, 2ª Seç, SALC, etc)
   technicianId: string | null;
   createdAt: string;
@@ -59,6 +60,7 @@ export interface Technician {
   avatar: string;
   active: boolean;
   specialty: string;
+  tags?: string[]; // Tags de competências: Redes, Infra, Software, Dev, Hardware, etc.
 }
 
 export interface Category {
@@ -70,13 +72,17 @@ export interface Category {
 }
 
 export type UserRole = 
+  | 'System Developer'
   | 'dev'
   | 'DEV'
   | 'CH-SECINFO' 
   | 'AUX-SECINFO' 
-  | 'CH-XERIFEINFO' 
-  | 'CH-TECNICOINFO' 
-  | 'CH-TVINFO'
+  | 'INF-XERIFE'
+  | 'INF-TECNICO' 
+  | 'INF-TV'
+  | 'CH-XERIFEINFO' // retrocompatibilidade
+  | 'CH-TECNICOINFO' // retrocompatibilidade
+  | 'CH-TVINFO' // retrocompatibilidade
   | 'CHSECINFO'
   | 'AUXSECINFO'
   | 'XERIFESECINFO'
@@ -84,17 +90,19 @@ export type UserRole =
 
 export interface MilitaryUser {
   id: string;
-  username: string; // Login único (ex: dev, dasdeves, cavalcanti, castro, arantes, machado, oliveira, vecchiato, tvinfo)
+  username: string; // Login único (ex: dev, dasneves, cavalcanti, castro, arantes, machado, oliveira, vecchiato, tvinfo)
   password: string; // Senha do militar
-  name: string; // Posto/Graduação e Nome (ex: 3º Sgt Das Deves, Sd Castro)
+  name: string; // Posto/Graduação e Nome (ex: 3º Sgt Das Neves, Sd Castro)
   rank: string; // Posto/Graduação (ex: 3º Sgt, Sd, Dev)
-  warName: string; // Nome de Guerra (ex: Das Deves, Castro, Arantes)
+  warName: string; // Nome de Guerra (ex: Das Neves, Castro, Arantes)
   role: UserRole;
   active: boolean;
   deactivationReason?: string; // Motivo do desligamento/afastamento
   deactivatedAt?: string; // Data do desligamento
   email?: string;
   specialty?: string;
+  tags?: string[]; // Tags de competência técnica: Redes, Infra, Dev, Software, Hardware, etc.
+  avatar?: string; // Foto ou avatar personalizado
   createdAt: string;
   failedAttempts?: number; // Contador de tentativas erradas (bloqueia com 3)
   isLocked?: boolean; // Se o login está bloqueado por erro de senha
@@ -104,8 +112,8 @@ export interface MilitaryUser {
 export interface SystemAuditLog {
   id: string;
   timestamp: string; // ISO
-  militaryName: string; // Ex: "3º Sgt Das Deves"
-  militaryLogin: string; // Ex: "dasdeves"
+  militaryName: string; // Ex: "3º Sgt Das Neves"
+  militaryLogin: string; // Ex: "dasneves"
   role: UserRole;
   actionType: 
     | 'PRORROGACAO_CAUTELA'

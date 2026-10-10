@@ -29,7 +29,9 @@ import {
   Sparkles,
   Download,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Star,
+  User
 } from 'lucide-react';
 import { Ticket, Department, Technician, Priority, TicketStatus, AccessibilitySettings, MilitaryUser } from '../types';
 import { generateTicketPdf } from '../utils/ticketPdf';
@@ -81,11 +83,11 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
   onClearInitialTicket,
 }) => {
   // Controle de Permissões baseado no Perfil Militar
-  const userRole = currentUser?.role || 'CH-SECINFO';
-  const isDev = userRole === 'dev' || userRole === 'DEV' || currentUser?.username === 'dev';
-  const isTV = userRole === 'CH-TVINFO';
-  const isTecnico = userRole === 'CH-TECNICOINFO' || userRole === 'TECINFO';
-  const isXerife = userRole === 'CH-XERIFEINFO' || userRole === 'XERIFESECINFO';
+  const userRole = currentUser?.role || '';
+  const isDev = userRole === 'dev' || userRole === 'DEV' || userRole === 'System Developer' || currentUser?.username === 'dev';
+  const isTV = userRole === 'CH-TVINFO' || userRole === 'INF-TV';
+  const isTecnico = userRole === 'INF-TECNICO' || userRole === 'CH-TECNICOINFO' || userRole === 'TECINFO';
+  const isXerife = userRole === 'INF-XERIFE' || userRole === 'CH-XERIFEINFO' || userRole === 'XERIFESECINFO';
   const isChefe = userRole === 'CH-SECINFO' || userRole === 'CHSECINFO' || isDev;
 
   // Regras estritas solicitadas:
@@ -133,14 +135,14 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
   const [tiChatInput, setTiChatInput] = useState<string>('');
 
   // Militares elegíveis para atribuição operacional de chamados:
-  // Regra solicitada: Remover sargentos (Das Deves, Cavalcanti), auxiliar (Sd Castro) e o dev (Guilherme Manfrinato).
+  // Regra solicitada: Remover sargentos (Das Neves, Cavalcanti), auxiliar (Sd Castro) e o dev (Guilherme Manfrinato).
   // Apenas técnicos operacionais (Sd Machado, Sd Oliveira, Sd Vecchiato, Sd Arantes) recebem atribuição direta.
   const assignableTechnicians = technicians.filter(tc => {
     const name = tc.name.toLowerCase();
     const role = (tc.role || '').toLowerCase();
     const id = tc.id.toLowerCase();
     if (id === 'tech-dev' || name.includes('manfrinato') || role.includes('desenvolvedor')) return false;
-    if (name.includes('sgt') || name.includes('sargento') || name.includes('das deves') || name.includes('cavalcanti')) return false;
+    if (name.includes('sgt') || name.includes('sargento') || name.includes('das neves') || name.includes('das deves') || name.includes('cavalcanti')) return false;
     if (name.includes('castro') || role.includes('auxiliar') || id === 'tech-castro') return false;
     return true;
   });
@@ -1785,9 +1787,18 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
 
             {/* Dados do Solicitante e Data */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-              <div>
-                <span className="text-slate-500 font-bold block">Militar Solicitante:</span>
-                <span className="text-slate-900 font-bold text-sm">{activeTicket.requesterName}</span>
+              <div className="flex items-center gap-3">
+                {activeTicket.requesterAvatar ? (
+                  <img src={activeTicket.requesterAvatar} alt={activeTicket.requesterName} className="w-11 h-11 rounded-2xl object-cover border border-[#27431e]/30 shrink-0 shadow-xs" />
+                ) : (
+                  <div className="w-11 h-11 rounded-2xl bg-[#1e3316] text-[#dfb642] font-black text-xs flex items-center justify-center shrink-0 border border-[#cba135]/40 shadow-xs">
+                    {activeTicket.requesterName.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <span className="text-slate-500 font-bold block">Militar Solicitante:</span>
+                  <span className="text-slate-900 font-bold text-sm">{activeTicket.requesterName}</span>
+                </div>
               </div>
               <div>
                 <span className="text-slate-500 font-bold block">Data de Abertura:</span>
@@ -2041,7 +2052,8 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                         type="button"
                         onClick={() => {
                           const tech = technicians.find(t => t.id === activeTicket.technicianId);
-                          const roleTag = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' ? 'CHINFO' : currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO' ? 'Xerife TI' : currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' ? 'Auxiliar TI' : 'TI';
+                          const isUserDev = currentUser?.role === 'System Developer' || currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || !!(currentUser?.name && currentUser.name.toLowerCase().includes('manfrinato'));
+                          const roleTag = isUserDev ? 'DEV' : (currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO') ? 'CHINFO' : currentUser?.role === 'INF-XERIFE' || currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO' ? 'Xerife TI' : currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' ? 'Auxiliar TI' : 'TI';
                           const senderName = currentUser ? `${currentUser.name} (${roleTag})` : (tech ? `${tech.name} (TI)` : 'Seção de TI');
                           onSendMessage(activeTicket.id, preset, 'ti', senderName);
                           setActiveTicket(prev => prev ? {
@@ -2075,7 +2087,8 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                     e.preventDefault();
                     if (!tiChatInput.trim()) return;
                     const tech = technicians.find(t => t.id === activeTicket.technicianId);
-                    const roleTag = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' ? 'CHINFO' : currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO' ? 'Xerife TI' : currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' ? 'Auxiliar TI' : 'TI';
+                    const isUserDev = currentUser?.role === 'System Developer' || currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || !!(currentUser?.name && currentUser.name.toLowerCase().includes('manfrinato'));
+                    const roleTag = isUserDev ? 'DEV' : (currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO') ? 'CHINFO' : currentUser?.role === 'INF-XERIFE' || currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO' ? 'Xerife TI' : currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO' ? 'Auxiliar TI' : 'TI';
                     const senderName = currentUser ? `${currentUser.name} (${roleTag})` : (tech ? `${tech.name} (TI)` : 'Seção de TI');
                     onSendMessage(activeTicket.id, tiChatInput.trim(), 'ti', senderName);
                     setActiveTicket(prev => prev ? {
@@ -2138,7 +2151,7 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 </div>
               </div>
             ) : (activeTicket.status === 'resolvido') ? (
-              <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/50 text-xs text-emerald-900 space-y-1">
+              <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/50 text-xs text-emerald-900 space-y-2">
                 <span className="font-black text-sm block flex items-center gap-1.5 text-emerald-900">
                   <CheckCircle2 className="w-4 h-4 text-emerald-700" />
                   <span>Chamado Concluído</span>
@@ -2150,9 +2163,40 @@ export const ITDashboard: React.FC<ITDashboardProps> = ({
                 )}
                 {activeTicket.resolutionNotes && (
                   <p className="mt-1 font-medium bg-white p-2 rounded-lg border border-emerald-200">
-                    {activeTicket.resolutionNotes}
+                    <strong>Solução:</strong> {activeTicket.resolutionNotes}
                   </p>
                 )}
+
+                {/* Avaliação do Atendimento pelo Solicitante */}
+                <div className="mt-2 pt-2 border-t border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">Avaliação do Solicitante:</span>
+                    {activeTicket.rating ? (
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`w-4 h-4 ${
+                              star <= activeTicket.rating!
+                                ? 'text-amber-500 fill-amber-500'
+                                : 'text-slate-300'
+                            }`}
+                          />
+                        ))}
+                        <span className="font-mono font-black text-amber-900 ml-1">
+                          ({activeTicket.rating}/5)
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-500 italic">Ainda não avaliado</span>
+                    )}
+                  </div>
+                  {activeTicket.userFeedback && (
+                    <div className="text-[11px] text-slate-700 italic bg-white px-2.5 py-1 rounded-md border border-emerald-200">
+                      "{activeTicket.userFeedback}"
+                    </div>
+                  )}
+                </div>
               </div>
             ) : null}
 
@@ -2843,7 +2887,14 @@ const KanbanTicketCard: React.FC<KanbanTicketCardProps> = ({
 
       {/* Solicitante */}
       <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2 mb-2">
-        <span className="truncate font-semibold text-slate-700">{ticket.requesterName}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {ticket.requesterAvatar ? (
+            <img src={ticket.requesterAvatar} alt={ticket.requesterName} className="w-4 h-4 rounded-full object-cover shrink-0" />
+          ) : (
+            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          )}
+          <span className="truncate font-semibold text-slate-700">{ticket.requesterName}</span>
+        </div>
       </div>
 
       {/* Alerta de Mensagens / Chat com o Solicitante */}
@@ -2858,6 +2909,19 @@ const KanbanTicketCard: React.FC<KanbanTicketCardProps> = ({
             <span className="truncate">{ticket.messages.some(m => m.sender === 'solicitante' && !m.readByTi) ? 'Dúvida do Solicitante!' : 'Canal com Solicitante'}</span>
           </span>
           <span className="font-mono font-bold shrink-0 ml-1">💬 {ticket.messages.length}</span>
+        </div>
+      )}
+
+      {/* Avaliação do Solicitante no Card */}
+      {ticket.rating && (
+        <div className="mb-2 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200 flex items-center justify-between">
+          <span className="flex items-center gap-1">
+            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+            <span>Avaliação:</span>
+          </span>
+          <span className="font-mono font-black text-amber-800">
+            {ticket.rating}/5 ★
+          </span>
         </div>
       )}
 
@@ -2876,7 +2940,7 @@ const KanbanTicketCard: React.FC<KanbanTicketCardProps> = ({
                 const role = (tc.role || '').toLowerCase();
                 const id = tc.id.toLowerCase();
                 if (id === 'tech-dev' || name.includes('manfrinato') || role.includes('desenvolvedor')) return false;
-                if (name.includes('sgt') || name.includes('sargento') || name.includes('das deves') || name.includes('cavalcanti')) return false;
+                if (name.includes('sgt') || name.includes('sargento') || name.includes('das neves') || name.includes('das deves') || name.includes('cavalcanti')) return false;
                 if (name.includes('castro') || role.includes('auxiliar') || id === 'tech-castro') return false;
                 return true;
               })

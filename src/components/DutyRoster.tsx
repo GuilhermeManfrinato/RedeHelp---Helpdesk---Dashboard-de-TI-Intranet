@@ -1,3 +1,27 @@
+/**
+ * ============================================================================
+ * REDEHELP - MÓDULO DA ESCALA DE SERVIÇO DE TI (DUTY ROSTER)
+ * 2º GRUPO DE ARTILHARIA DE CAMPANHA - REGIMENTO DEODORO
+ * ============================================================================
+ * 
+ * GUIA DE DESACOPLAMENTO / EXPORTAÇÃO INDEPENDENTE DESTE MÓDULO:
+ * O sistema RedeHelp foi arquitetado de modo que este módulo de escala de serviço
+ * possa ser facilmente isolado, ativado ou desativado para outros projetos.
+ * 
+ * COMO DESATIVAR OU EXPORTAR O SISTEMA SEM A ESCALA:
+ * 1. Em `src/App.tsx`, altere a constante mestra:
+ *      export const ENABLE_DUTY_ROSTER = false;
+ * 2. Isso automaticamente:
+ *    - Remove o botão "Escala de Serviço" da barra lateral (AdminSidebar).
+ *    - Desativa a rota de navegação e a renderização do componente <DutyRoster />.
+ * 3. Se desejar remover o código fonte deste arquivo integralmente:
+ *    - Exclua o arquivo `src/components/DutyRoster.tsx`.
+ *    - Remova a importação em `src/App.tsx` e `src/components/AdminSidebar.tsx`.
+ *    - O restante do sistema (Chamados, Cautelas de Notebook, Ordens de Missão, 
+ *      Militares & Auditoria, Intranet) continuará operando 100% de forma independente.
+ * ============================================================================
+ */
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShieldAlert, 
@@ -39,7 +63,8 @@ import {
   Brain,
   Eraser,
   Palmtree,
-  Plus
+  Plus,
+  Construction
 } from 'lucide-react';
 import { 
   MilitaryUser, 
@@ -71,13 +96,14 @@ interface DutyRosterProps {
   technicians: Technician[];
   a11y: AccessibilitySettings;
   onAddAuditLog?: (log: any) => void;
+  onGoBackToDashboard?: () => void;
 }
 
-// 12 Militares Oficiais da Escala de TI do 2º GAC (Regimento Deodoro)
+// 24 Militares Oficiais da Escala de TI do 2º GAC (Regimento Deodoro)
 // Ordenados estritamente por Antiguidade Militar:
 // 1. Todos os EPs (Efetivos Profissionais) mais antigos que os EVs
 // 2. SD Manfrinato (59) posicionado junto aos EPs no topo (criador da escala e do sistema)
-// 3. EVs ordenados por antiguidade (número EV menor para maior: 05, 17, 25, 42, 44, 54)
+// 3. EVs ordenados por antiguidade oficial
 export const OFFICIAL_ROSTER_MILITARY: DutyRosterMilitary[] = [
   // --- EFETIVOS PROFISSIONAIS (EPs) ---
   {
@@ -135,11 +161,65 @@ export const OFFICIAL_ROSTER_MILITARY: DutyRosterMilitary[] = [
     category: 'EP',
     active: true,
   },
+  {
+    id: 'mil-almeida',
+    antiguidade: 7,
+    gradNome: 'SD EP ALMEIDA',
+    warName: 'Almeida',
+    rank: 'SD',
+    category: 'EP',
+    active: true,
+  },
+  {
+    id: 'mil-carvalho',
+    antiguidade: 8,
+    gradNome: 'SD EP CARVALHO',
+    warName: 'Carvalho',
+    rank: 'SD',
+    category: 'EP',
+    active: true,
+  },
+  {
+    id: 'mil-lima',
+    antiguidade: 9,
+    gradNome: 'SD EP LIMA',
+    warName: 'Lima',
+    rank: 'SD',
+    category: 'EP',
+    active: true,
+  },
+  {
+    id: 'mil-silva',
+    antiguidade: 10,
+    gradNome: 'SD EP SILVA',
+    warName: 'Silva',
+    rank: 'SD',
+    category: 'EP',
+    active: true,
+  },
+  {
+    id: 'mil-costa-ep',
+    antiguidade: 11,
+    gradNome: 'SD EP COSTA',
+    warName: 'Costa',
+    rank: 'SD',
+    category: 'EP',
+    active: true,
+  },
+  {
+    id: 'mil-santos-ep',
+    antiguidade: 12,
+    gradNome: 'SD EP SANTOS',
+    warName: 'Santos',
+    rank: 'SD',
+    category: 'EP',
+    active: true,
+  },
 
   // --- EFETIVOS VARIÁVEIS (EVs) ---
   {
     id: 'mil-ferreira',
-    antiguidade: 7,
+    antiguidade: 13,
     gradNome: 'SD EV FERREIRA (05)',
     warName: 'Ferreira',
     rank: 'SD',
@@ -149,7 +229,7 @@ export const OFFICIAL_ROSTER_MILITARY: DutyRosterMilitary[] = [
   },
   {
     id: 'mil-oliveira',
-    antiguidade: 8,
+    antiguidade: 14,
     gradNome: 'SD EV OLIVEIRA (17)',
     warName: 'Oliveira',
     rank: 'SD',
@@ -159,7 +239,7 @@ export const OFFICIAL_ROSTER_MILITARY: DutyRosterMilitary[] = [
   },
   {
     id: 'mil-machado',
-    antiguidade: 9,
+    antiguidade: 15,
     gradNome: 'SD EV MACHADO (25)',
     warName: 'Machado',
     rank: 'SD',
@@ -169,7 +249,7 @@ export const OFFICIAL_ROSTER_MILITARY: DutyRosterMilitary[] = [
   },
   {
     id: 'mil-vecchiato',
-    antiguidade: 10,
+    antiguidade: 16,
     gradNome: 'SD EV VECCHIATO (42)',
     warName: 'Vecchiato',
     rank: 'SD',
@@ -179,7 +259,7 @@ export const OFFICIAL_ROSTER_MILITARY: DutyRosterMilitary[] = [
   },
   {
     id: 'mil-custodio',
-    antiguidade: 11,
+    antiguidade: 17,
     gradNome: 'SD EV CUSTÓDIO (44)',
     warName: 'Custódio',
     rank: 'SD',
@@ -189,12 +269,72 @@ export const OFFICIAL_ROSTER_MILITARY: DutyRosterMilitary[] = [
   },
   {
     id: 'mil-wandrade',
-    antiguidade: 12,
+    antiguidade: 18,
     gradNome: 'SD EV W. ANDRADE (54)',
     warName: 'W. Andrade',
     rank: 'SD',
     category: 'EV',
     number: '54',
+    active: true,
+  },
+  {
+    id: 'mil-barbosa',
+    antiguidade: 19,
+    gradNome: 'SD EV BARBOSA (61)',
+    warName: 'Barbosa',
+    rank: 'SD',
+    category: 'EV',
+    number: '61',
+    active: true,
+  },
+  {
+    id: 'mil-souza',
+    antiguidade: 20,
+    gradNome: 'SD EV SOUZA (63)',
+    warName: 'Souza',
+    rank: 'SD',
+    category: 'EV',
+    number: '63',
+    active: true,
+  },
+  {
+    id: 'mil-rocha',
+    antiguidade: 21,
+    gradNome: 'SD EV ROCHA (68)',
+    warName: 'Rocha',
+    rank: 'SD',
+    category: 'EV',
+    number: '68',
+    active: true,
+  },
+  {
+    id: 'mil-pereira',
+    antiguidade: 22,
+    gradNome: 'SD EV PEREIRA (72)',
+    warName: 'Pereira',
+    rank: 'SD',
+    category: 'EV',
+    number: '72',
+    active: true,
+  },
+  {
+    id: 'mil-martins',
+    antiguidade: 23,
+    gradNome: 'SD EV MARTINS (77)',
+    warName: 'Martins',
+    rank: 'SD',
+    category: 'EV',
+    number: '77',
+    active: true,
+  },
+  {
+    id: 'mil-gomes',
+    antiguidade: 24,
+    gradNome: 'SD EV GOMES (81)',
+    warName: 'Gomes',
+    rank: 'SD',
+    category: 'EV',
+    number: '81',
     active: true,
   },
 ];
@@ -205,18 +345,61 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
   technicians,
   a11y,
   onAddAuditLog,
+  onGoBackToDashboard,
 }) => {
   // Permissões
-  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
+  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.role === 'System Developer' || currentUser?.username === 'dev' || currentUser?.rank === 'Dev' || !!(currentUser?.name && currentUser.name.toLowerCase().includes('manfrinato'));
   const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || isDev;
   const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
-  const isXerife = currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO';
+  const isXerife = currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO' || currentUser?.role === 'INF-XERIFE';
   const isTech = !isChefe && !isAux && !isXerife && !isDev;
+
+  // Regra de Acesso Estrita: Apenas Chefe de Seção e Devs podem acessar a Escala de Serviço.
+  // Técnicos, Auxiliares de TI e Xerifes visualizam a tela "Em desenvolvimento".
+  const hasDutyRosterAccess = isChefe || isDev;
 
   const canEditRoster = isChefe || isAux || isDev;
   const canFlagSwaps = isXerife || isChefe || isAux || isDev;
   const canHomologateSwaps = isChefe || isDev;
   const hasTimeRestriction = isTech; // Técnico vê apenas 14 dias (semana atual e próxima)
+
+  // Configuração dos Parâmetros da Escala (DEV / Chefe)
+  const [isScaleConfigModalOpen, setIsScaleConfigModalOpen] = useState(false);
+  const [scaleRestDays, setScaleRestDays] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('eb_scale_rest_days')) || 6;
+    } catch {
+      return 6;
+    }
+  });
+  const [scaleDutyDays, setScaleDutyDays] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('eb_scale_duty_days')) || 1;
+    } catch {
+      return 1;
+    }
+  });
+  const [scaleMilitariesPerDay, setScaleMilitariesPerDay] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('eb_scale_militaries_per_day')) || 2;
+    } catch {
+      return 2;
+    }
+  });
+  const [scaleLabelPerm, setScaleLabelPerm] = useState<string>(() => {
+    try {
+      return localStorage.getItem('eb_scale_label_perm') || 'Permanência';
+    } catch {
+      return 'Permanência';
+    }
+  });
+  const [scaleLabelSobr, setScaleLabelSobr] = useState<string>(() => {
+    try {
+      return localStorage.getItem('eb_scale_label_sobr') || 'Sobreaviso';
+    } catch {
+      return 'Sobreaviso';
+    }
+  });
 
   // Abas do Módulo de Escala
   const [activeTab, setActiveTab] = useState<'matrix' | 'checklists' | 'livro' | 'swaps' | 'keys'>('matrix');
@@ -272,6 +455,15 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
       if (raw) {
         const parsed: DutyRosterMilitary[] = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length >= 12 && parsed.every(p => p && p.id && p.category && p.warName)) {
+          // Incorporar novos militares oficiais se o storage local possuir menos que o efetivo oficial completo
+          const missing = OFFICIAL_ROSTER_MILITARY.filter(om => !parsed.some(p => p.id === om.id));
+          if (missing.length > 0) {
+            const merged = [...parsed, ...missing];
+            try {
+              localStorage.setItem('eb_roster_military_v2', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          }
           return parsed;
         }
       }
@@ -632,6 +824,33 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
         return -88888888;
       }
 
+      // NOVO REQUISITO ESTRITO: Nenhum militar pode ser escalado antes de atingir o período configurado de descanso (scaleRestDays)!
+      if (lastDuty !== undefined) {
+        const daysSinceLastDuty = d - lastDuty - 1;
+        if (scaleType === 'corrida') {
+          if (daysSinceLastDuty < scaleRestDays) {
+            // Penalidade astronômica: impede que militares entrem de serviço antes de completarem as folgas estipuladas
+            return -50000000 + (daysSinceLastDuty * 1000);
+          }
+        } else {
+          // Escala Preta e Vermelha
+          if (daysSinceLastDuty < 1) {
+            return -88888888; // Nunca tirar serviço em dias consecutivos no calendário real
+          }
+          if (isRed) {
+            const lastRed = lastRedDutyIdxMap[m.id];
+            if (lastRed !== undefined && (redIndex - lastRed - 1) < scaleRestDays) {
+              return -50000000 + ((redIndex - lastRed - 1) * 1000);
+            }
+          } else {
+            const lastBlack = lastBlackDutyIdxMap[m.id];
+            if (lastBlack !== undefined && (blackIndex - lastBlack - 1) < scaleRestDays) {
+              return -50000000 + ((blackIndex - lastBlack - 1) * 1000);
+            }
+          }
+        }
+      }
+
       let score = 0;
 
       // 3. PRIORIDADE MÁXIMA: Retorno de férias ou baixa médica (o militar mais descansado de todos)
@@ -644,41 +863,41 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
         return diff >= 1 && diff <= 7;
       });
 
-      const hasPulledDutySince = lastDuty !== undefined && lastDuty >= (d - 6);
+      const hasPulledDutySince = lastDuty !== undefined && lastDuty >= (d - scaleRestDays);
       if (justReturned && !hasPulledDutySince) {
         score += 50000; // Prioridade absoluta para quem acabou de voltar de afastamento!
       }
 
-      // 4. CÁLCULO DO "MAIS FOLGADO" (MÁXIMO 5 DIAS DE DESCANSO)
-      let restCount = 5; // Caso não tenha puxado serviço ainda no mês, está no descanso máximo (5)
+      // 4. CÁLCULO DO "MAIS FOLGADO" (MÁXIMO DE scaleRestDays DIAS DE DESCANSO)
+      let restCount = scaleRestDays; // Caso não tenha puxado serviço ainda no mês, está no descanso máximo (scaleRestDays)
       if (scaleType === 'preta_vermelha') {
         if (isRed) {
           const lastRedIdx = lastRedDutyIdxMap[m.id];
           if (lastRedIdx !== undefined) {
             const diff = redIndex - lastRedIdx - 1;
-            restCount = Math.max(0, Math.min(5, diff));
+            restCount = Math.max(0, Math.min(scaleRestDays, diff));
           }
         } else {
           const lastBlackIdx = lastBlackDutyIdxMap[m.id];
           if (lastBlackIdx !== undefined) {
             const diff = blackIndex - lastBlackIdx - 1;
-            restCount = Math.max(0, Math.min(5, diff));
+            restCount = Math.max(0, Math.min(scaleRestDays, diff));
           }
         }
       } else {
         // Escala corrida contínua
         if (lastDuty !== undefined) {
           const diff = d - lastDuty - 1;
-          restCount = Math.max(0, Math.min(5, diff));
+          restCount = Math.max(0, Math.min(scaleRestDays, diff));
         }
       }
 
-      // Quanto maior a folga acumulada (até 5), maior a prioridade de pegar serviço!
+      // Quanto maior a folga acumulada (até scaleRestDays), maior a prioridade de pegar serviço!
       score += restCount * 3000;
 
-      // Se atingiu o teto máximo de descanso (5 dias de folga), ganha prioridade de escala
-      if (restCount >= 5) {
-        score += 10000;
+      // Se atingiu o teto de descanso configurado (scaleRestDays dias de folga), ganha prioridade de escala
+      if (restCount >= scaleRestDays) {
+        score += 20000;
       }
 
       // 5. Equilíbrio de justiça: militares com menos serviços no mês têm prioridade
@@ -692,6 +911,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
     };
 
     // 3. Preenchimento automático para os dias a partir de fromDay até o final do mês
+    const poolSize = (scaleRestDays + scaleDutyDays) || 8;
     for (let d = fromDay; d <= daysInMonth.length; d++) {
       const dStr = getDateStr(d);
       const isRed = redDays.includes(d);
@@ -712,15 +932,22 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
         .map(m => ({ militar: m, score: scoreCandidate(m, d, dStr, isRed, rIdx, bIdx) }))
         .sort((a, b) => b.score - a.score);
 
-      const bestEp = scoredEps[0]?.militar || eps[0];
-      const bestEv = scoredEvs[0]?.militar || evs[0];
+      let bestEp = scoredEps[0]?.militar || eps[0];
+      let bestEv = scoredEvs[0]?.militar || evs[0];
+
+      // Se um dos grupos estiver em falta de candidatos descansados (score negativo), buscar do grupo alternativo
+      if (scoredEps[0]?.score < 0 && scoredEvs[1]?.score >= 0) {
+        bestEp = scoredEvs[1].militar;
+      } else if (scoredEvs[0]?.score < 0 && scoredEps[1]?.score >= 0) {
+        bestEv = scoredEps[1].militar;
+      }
 
       // Proporção 3:1 de Sobreaviso / Permanência
-      const cycleIdx = Math.floor((d - 1) / (eps.length || 6));
+      const cycleIdx = Math.floor((d - 1) / poolSize);
       const isEpPerm = cycleIdx % 4 === 3;
 
       let chosenPerm = isEpPerm ? bestEp : bestEv;
-      let chosenSobr = isEpPerm ? bestEv : bestEp;
+      let chosenSobr: DutyRosterMilitary | null = scaleMilitariesPerDay >= 2 ? (isEpPerm ? bestEv : bestEp) : null;
 
       // Se houver permuta homologada neste dia, aplicar substituto
       if (swapForDay) {
@@ -734,33 +961,37 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
       }
 
       lastDutyDayMap[chosenPerm.id] = d;
-      lastDutyDayMap[chosenSobr.id] = d;
-      if (isRed && rIdx >= 0) {
-        lastRedDutyIdxMap[chosenPerm.id] = rIdx;
-        lastRedDutyIdxMap[chosenSobr.id] = rIdx;
-      }
-      if (!isRed && bIdx >= 0) {
-        lastBlackDutyIdxMap[chosenPerm.id] = bIdx;
-        lastBlackDutyIdxMap[chosenSobr.id] = bIdx;
-      }
+      if (isRed && rIdx >= 0) lastRedDutyIdxMap[chosenPerm.id] = rIdx;
+      if (!isRed && bIdx >= 0) lastBlackDutyIdxMap[chosenPerm.id] = bIdx;
       totalDutiesMap[chosenPerm.id] = (totalDutiesMap[chosenPerm.id] || 0) + 1;
-      totalDutiesMap[chosenSobr.id] = (totalDutiesMap[chosenSobr.id] || 0) + 1;
+
+      if (chosenSobr) {
+        lastDutyDayMap[chosenSobr.id] = d;
+        if (isRed && rIdx >= 0) lastRedDutyIdxMap[chosenSobr.id] = rIdx;
+        if (!isRed && bIdx >= 0) lastBlackDutyIdxMap[chosenSobr.id] = bIdx;
+        totalDutiesMap[chosenSobr.id] = (totalDutiesMap[chosenSobr.id] || 0) + 1;
+      }
+
+      const permNome = chosenPerm.gradNome;
+      const permId = chosenPerm.id;
+      const sobrNome = chosenSobr ? chosenSobr.gradNome : 'Não Escalado';
+      const sobrId = chosenSobr ? chosenSobr.id : '';
 
       const newEntry: DutyShiftEntry = existing ? {
         ...existing,
-        permanenciaNome: chosenPerm.gradNome,
-        permanenciaId: chosenPerm.id,
-        sobreavisoNome: chosenSobr.gradNome,
-        sobreavisoId: chosenSobr.id,
+        permanenciaNome: permNome,
+        permanenciaId: permId,
+        sobreavisoNome: sobrNome,
+        sobreavisoId: sobrId,
         isAdministrativeDay: isAdmin,
       } : {
         id: `shift-${dStr}`,
         date: dStr,
         isAdministrativeDay: isAdmin,
-        permanenciaId: chosenPerm.id,
-        permanenciaNome: chosenPerm.gradNome,
-        sobreavisoId: chosenSobr.id,
-        sobreavisoNome: chosenSobr.gradNome,
+        permanenciaId: permId,
+        permanenciaNome: permNome,
+        sobreavisoId: sobrId,
+        sobreavisoNome: sobrNome,
         chavesDtiOk: false,
         radioTelefoneOk: false,
         ronda1PosExpedienteOk: false,
@@ -808,37 +1039,50 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
   // -------------------------------------------------------------
   const calculateDefaultDutyPair = (day: number) => {
     const safeDay = Math.max(1, day);
-    const poolSize = eps.length || 6;
-    
+    const poolSize = (scaleRestDays + scaleDutyDays) || 8;
+    const epCount = eps.length || 1;
+    const evCount = evs.length || 1;
+
     if (scaleType === 'preta_vermelha') {
       const isRed = redDays.includes(day);
       if (isRed) {
         const redIdx = redDays.indexOf(day);
-        const cycleDayRed = redIdx % poolSize;
-        const cycleIndexRed = Math.floor(redIdx / poolSize);
-        const ep = eps[cycleDayRed % (eps.length || 1)] || OFFICIAL_ROSTER_MILITARY[0];
-        const ev = evs[cycleDayRed % (evs.length || 1)] || OFFICIAL_ROSTER_MILITARY[6];
-        const isEpPermanencia = cycleIndexRed % 4 === 3;
-        return isEpPermanencia ? { permanencia: ep, sobreaviso: ev } : { permanencia: ev, sobreaviso: ep };
+        const epIdx = redIdx % poolSize;
+        const evIdx = redIdx % poolSize;
+        const ep = eps[epIdx % epCount] || rosterMilitary[0];
+        const ev = evs[evIdx % evCount] || rosterMilitary[epCount] || rosterMilitary[0];
+        const isEpPerm = Math.floor(redIdx / poolSize) % 4 === 3;
+        return {
+          permanencia: isEpPerm ? ep : ev,
+          sobreaviso: scaleMilitariesPerDay >= 2 ? (isEpPerm ? ev : ep) : null as any,
+        };
       } else {
         const blackIdx = blackDays.indexOf(day);
-        const cycleDayBlack = blackIdx % poolSize;
-        const cycleIndexBlack = Math.floor(blackIdx / poolSize);
-        const ep = eps[cycleDayBlack % (eps.length || 1)] || OFFICIAL_ROSTER_MILITARY[0];
-        const ev = evs[cycleDayBlack % (evs.length || 1)] || OFFICIAL_ROSTER_MILITARY[6];
-        const isEpPermanencia = cycleIndexBlack % 4 === 3;
-        return isEpPermanencia ? { permanencia: ep, sobreaviso: ev } : { permanencia: ev, sobreaviso: ep };
+        const epIdx = blackIdx % poolSize;
+        const evIdx = blackIdx % poolSize;
+        const ep = eps[epIdx % epCount] || rosterMilitary[0];
+        const ev = evs[evIdx % evCount] || rosterMilitary[epCount] || rosterMilitary[0];
+        const isEpPerm = Math.floor(blackIdx / poolSize) % 4 === 3;
+        return {
+          permanencia: isEpPerm ? ep : ev,
+          sobreaviso: scaleMilitariesPerDay >= 2 ? (isEpPerm ? ev : ep) : null as any,
+        };
       }
     }
 
-    // Escala Corrida: rotação com pool de 6 militares para garantir máximo 5 dias de folga (1 a 5)
+    // Escala Corrida: rotação com poolSize estrito (1 dia serviço + scaleRestDays folgas)
     const cycleDay = (safeDay - 1) % poolSize;
     const cycleIndex = Math.floor((safeDay - 1) / poolSize);
-    const ep = eps[cycleDay % (eps.length || 1)] || OFFICIAL_ROSTER_MILITARY[0];
-    const ev = evs[cycleDay % (evs.length || 1)] || OFFICIAL_ROSTER_MILITARY[6];
+
+    // Mapeamento estrito por cycleDay: garante escala 1xN com exatamente scaleRestDays de folga
+    const ep = eps[cycleDay % epCount] || rosterMilitary[0];
+    const ev = evs[cycleDay % evCount] || rosterMilitary[epCount] || rosterMilitary[0];
     const isEpPermanencia = cycleIndex % 4 === 3;
 
-    return isEpPermanencia ? { permanencia: ep, sobreaviso: ev } : { permanencia: ev, sobreaviso: ep };
+    return {
+      permanencia: isEpPermanencia ? ep : ev,
+      sobreaviso: scaleMilitariesPerDay >= 2 ? (isEpPermanencia ? ev : ep) : null as any,
+    };
   };
 
   // Obter o registro formal do plantão para uma data (resiliente e com backward compatibility)
@@ -1176,13 +1420,12 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
       const dEnd = new Date(l.dataFim + 'T00:00:00');
       const dCur = new Date(dateStr + 'T00:00:00');
       const diff = Math.round((dCur.getTime() - dEnd.getTime()) / (1000 * 60 * 60 * 24));
-      return diff >= 1 && diff <= 4;
+      return diff >= 1 && diff <= scaleRestDays;
     });
 
     // -------------------------------------------------------------
-    // CONTAGEM DE DIAS DE DESCANSO (1 a 5) - "O MAIS FOLGADO"
-    // Regra militar:
-    // "sendo no máximo 5 dias de descanso, não precisa ter um padrão, somente siga pelo mais folgado"
+    // -------------------------------------------------------------
+    // CONTAGEM DE DIAS DE DESCANSO (1 a scaleRestDays) - "O MAIS FOLGADO"
     // -------------------------------------------------------------
     if (scaleType === 'corrida') {
       let lastDutyDay = -1;
@@ -1196,7 +1439,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
       let count = 1;
       if (lastDutyDay > 0) {
         const diff = day - lastDutyDay;
-        count = Math.min(5, Math.max(1, diff));
+        count = Math.min(scaleRestDays, Math.max(1, diff));
       } else {
         let nextDutyDay = -1;
         for (let next = day + 1; next <= daysInMonth.length; next++) {
@@ -1207,16 +1450,16 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
         }
         if (nextDutyDay > 0) {
           const diff = nextDutyDay - day;
-          count = Math.min(5, Math.max(1, 6 - diff));
+          count = Math.min(scaleRestDays, Math.max(1, (scaleRestDays + 1) - diff));
         } else {
-          count = 5;
+          count = scaleRestDays;
         }
       }
 
       return {
         type: isRedDay ? 'vermelha' : 'folga',
         text: String(count),
-        title: `${isRedDay ? 'Escala Corrida (Fim de Semana / Administrativo)' : 'Escala Corrida (Dia de Semana)'} - Folga ${count}/5 (Mais Folgado)${justReturned ? ' ⭐ [RETORNO DE AFASTAMENTO - PRIORITÁRIO PARA SERVIÇO]' : ''}`,
+        title: `${isRedDay ? 'Escala Corrida (Fim de Semana / Administrativo)' : 'Escala Corrida (Dia de Semana)'} - Folga ${count}/${scaleRestDays} (Mais Folgado)${justReturned ? ' ⭐ [RETORNO DE AFASTAMENTO - PRIORITÁRIO PARA SERVIÇO]' : ''}`,
       };
     } else {
       // Escala Preta e Vermelha Separada
@@ -1233,7 +1476,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
         let count = 1;
         if (lastRedDutyIndex >= 0) {
           const diff = currentRedIndex - lastRedDutyIndex;
-          count = Math.min(5, Math.max(1, diff));
+          count = Math.min(scaleRestDays, Math.max(1, diff));
         } else {
           let nextRedDutyIndex = -1;
           for (let i = currentRedIndex + 1; i < redDays.length; i++) {
@@ -1244,16 +1487,16 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
           }
           if (nextRedDutyIndex >= 0) {
             const diff = nextRedDutyIndex - currentRedIndex;
-            count = Math.min(5, Math.max(1, 6 - diff));
+            count = Math.min(scaleRestDays, Math.max(1, (scaleRestDays + 1) - diff));
           } else {
-            count = 5;
+            count = scaleRestDays;
           }
         }
 
         return {
           type: 'vermelha',
           text: String(count),
-          title: `Escala Vermelha - Folga ${count}/5 (Sábado/Domingo/Feriado)${justReturned ? ' ⭐ [RETORNO DE AFASTAMENTO - PRIORITÁRIO]' : ''}`,
+          title: `Escala Vermelha - Folga ${count}/${scaleRestDays} (Sábado/Domingo/Feriado)${justReturned ? ' ⭐ [RETORNO DE AFASTAMENTO - PRIORITÁRIO]' : ''}`,
         };
       } else {
         const currentBlackIndex = blackDays.indexOf(day);
@@ -1268,7 +1511,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
         let count = 1;
         if (lastBlackDutyIndex >= 0) {
           const diff = currentBlackIndex - lastBlackDutyIndex;
-          count = Math.min(5, Math.max(1, diff));
+          count = Math.min(scaleRestDays, Math.max(1, diff));
         } else {
           let nextBlackDutyIndex = -1;
           for (let i = currentBlackIndex + 1; i < blackDays.length; i++) {
@@ -1279,16 +1522,16 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
           }
           if (nextBlackDutyIndex >= 0) {
             const diff = nextBlackDutyIndex - currentBlackIndex;
-            count = Math.min(5, Math.max(1, 6 - diff));
+            count = Math.min(scaleRestDays, Math.max(1, (scaleRestDays + 1) - diff));
           } else {
-            count = 5;
+            count = scaleRestDays;
           }
         }
 
         return {
           type: 'folga',
           text: String(count),
-          title: `Escala Preta - Folga ${count}/5 (Segunda a Sexta)${justReturned ? ' ⭐ [RETORNO DE AFASTAMENTO - PRIORITÁRIO]' : ''}`,
+          title: `Escala Preta - Folga ${count}/${scaleRestDays} (Segunda a Sexta)${justReturned ? ' ⭐ [RETORNO DE AFASTAMENTO - PRIORITÁRIO]' : ''}`,
         };
       }
     }
@@ -1516,7 +1759,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
     alert('A escala do mês foi ZERADA com sucesso. Todas as células estão em branco.');
   };
 
-  // Gerar Escala Inteligente usando IA / Regra do Mais Folgado (Máximo 5 dias de descanso)
+  // Gerar Escala Inteligente usando IA / Regra do Mais Folgado (Regime scaleDutyDays x scaleRestDays)
   const handleGenerateIntelligentRoster = () => {
     if (!canEditRoster) {
       alert('Apenas o Chefe de Seção ou Auxiliar podem gerar a escala automática.');
@@ -1541,11 +1784,11 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
       militaryLogin: currentUser?.username || 'chefe',
       role: currentUser?.role || 'CH-SECINFO',
       actionType: 'STATUS_MISSAO',
-      summary: `Escala Inteligente (IA) gerada para ${selectedMonth + 1}/${selectedYear} pela Regra do Mais Folgado (máximo 5 folgas 1..5) e prioridades de retorno.`,
+      summary: `Escala Inteligente (IA) gerada para ${selectedMonth + 1}/${selectedYear} pela Regra do Mais Folgado (Regime ${scaleDutyDays}x${scaleRestDays} com folgas 1..${scaleRestDays}) e prioridades de retorno.`,
       targetRef: `ESCALA-${monthPrefix}`,
     });
 
-    alert('✨ Escala Inteligente gerada com sucesso!\nRegra do Mais Folgado aplicada com máximo 5 dias de folga (1 a 5), priorizando afastamentos e retornos de férias/baixa.');
+    alert(`✨ Escala Inteligente gerada com sucesso!\nRegra do Mais Folgado aplicada para Regime ${scaleDutyDays}x${scaleRestDays} (${scaleRestDays} dias de folga: 1 a ${scaleRestDays}), garantindo estritamente o tempo de descanso dos militares.`);
   };
 
   // Cadastrar Afastamento (Férias, Baixa médica, Missão, Licença)
@@ -1739,7 +1982,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
     onAddAuditLog?.({
       militaryName: currentUser?.name || 'Xerife da TI',
       militaryLogin: currentUser?.username || 'arantes',
-      role: currentUser?.role || 'CH-XERIFEINFO',
+      role: currentUser?.role || 'INF-XERIFE',
       actionType: 'STATUS_MISSAO',
       summary: `Xerife sinalizou permuta entre ${swapMilitarOrig} (${swapDataOrig}) e ${swapMilitarSubst} (${swapDataSubst})`,
       details: `Motivo: ${swapMotivo}. Declaração: ambos concordaram.`,
@@ -1917,7 +2160,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
     onAddAuditLog?.({
       militaryName: currentUser?.name || 'Militar da TI',
       militaryLogin: currentUser?.username || 'ti',
-      role: currentUser?.role || 'CH-TECNICOINFO',
+      role: currentUser?.role || 'INF-TECNICO',
       actionType: 'STATUS_MISSAO',
       summary: `Passagem de Chave da [${keySelected}]: ${keyGiverName} ➔ ${keyReceiverName}`,
       details: keyNotes || 'Assinatura digital dupla confirmada por senha.',
@@ -1941,7 +2184,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
     onAddAuditLog?.({
       militaryName: currentUser?.name || 'Informático de Dia',
       militaryLogin: currentUser?.username || 'ti',
-      role: currentUser?.role || 'CH-TECNICOINFO',
+      role: currentUser?.role || 'INF-TECNICO',
       actionType: 'STATUS_MISSAO',
       summary: `🚨 ACIONAMENTO DE EMERGÊNCIA 3º CTA: ${ctaIncidentText.trim()}`,
       details: `Central 3º CTA: (11) 3886-2040. Registrado em plantão militar.`,
@@ -1958,6 +2201,118 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
 
+  // RESTRIÇÃO DE ACESSO: Liberado apenas para Chefe de Seção (CH-SECINFO) e Desenvolvedores (Devs)
+  // Técnicos, Auxiliares de TI e Xerifes visualizam a tela "Em desenvolvimento"
+  if (!hasDutyRosterAccess) {
+    return (
+      <div className={`p-4 md:p-8 min-h-[calc(100vh-160px)] flex items-center justify-center ${
+        a11y.highContrast ? 'bg-black text-white' : 'bg-[#0f1a0b]/40'
+      }`}>
+        <div className={`max-w-2xl w-full rounded-3xl p-6 sm:p-10 text-center shadow-2xl border transition-all ${
+          a11y.highContrast
+            ? 'bg-black border-yellow-400 text-yellow-400'
+            : 'bg-gradient-to-b from-[#1b2f15] to-[#142310] border-[#cba135]/40 text-slate-100 shadow-2xl shadow-black/60'
+        }`}>
+          {/* Animated Header Badge & Icon */}
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-[#243d1c] to-[#345828] border-2 border-[#dfb642] flex items-center justify-center shadow-xl shadow-[#dfb642]/10 transform transition-transform hover:scale-105">
+                <Construction className="w-10 h-10 text-[#dfb642] animate-bounce" />
+              </div>
+              <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-amber-500/90 border-2 border-[#192b14] flex items-center justify-center text-white shadow-md">
+                <Lock className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#dfb642]/15 border border-[#dfb642]/40 text-[#dfb642] font-black text-xs uppercase tracking-wider mb-4">
+            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+            <span>Módulo em Desenvolvimento & Homologação</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-3">
+            Escala de Serviço - 2º GAC
+          </h2>
+
+          <p className="text-sm text-emerald-100/80 leading-relaxed max-w-lg mx-auto mb-6">
+            O módulo operacional de escala de serviço (permanência, sobreaviso, livro de partes e livro de chaves) está em processo de testes e validação final pela equipe técnica.
+          </p>
+
+          {/* Card de Restrição de Perfil */}
+          <div className={`p-4 sm:p-5 rounded-2xl mb-6 text-left border ${
+            a11y.highContrast 
+              ? 'bg-black border-yellow-400' 
+              : 'bg-[#101b0d]/70 border-[#cba135]/25 backdrop-blur-sm'
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 mt-0.5">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div className="space-y-1.5 flex-1 text-xs">
+                <h4 className="font-bold text-amber-300 text-sm flex items-center justify-between">
+                  <span>Acesso Restrito Temporário</span>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200">
+                    Restrição Ativa
+                  </span>
+                </h4>
+                <p className="text-slate-300 leading-relaxed">
+                  A visualização e gerenciamento das escalas estão liberados exclusivamente para o <strong className="text-white">Chefe da Seção de Informática (CH-SECINFO)</strong> e os <strong className="text-white">Desenvolvedores (Devs)</strong>.
+                </p>
+                <div className="pt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                  <span>Militar Conectado:</span>
+                  <span className="font-mono text-emerald-300 font-bold bg-[#1e3316] px-2 py-0.5 rounded-md border border-[#cba135]/30">
+                    {currentUser?.rank || ''} {currentUser?.name || 'Militar'} ({currentUser?.role || 'Corpo Técnico'})
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards de Recursos em Homologação */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-8 text-left text-xs">
+            <div className="p-3 rounded-xl bg-[#142310] border border-[#cba135]/20">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-300 mb-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#dfb642]" />
+                <span>Regime 1xN Militar</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Algoritmo de descanso dinâmico pelo Mais Folgado em homologação.</p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#142310] border border-[#cba135]/20">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-300 mb-1">
+                <Key className="w-3.5 h-3.5 text-[#dfb642]" />
+                <span>Passagem de Chaves</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Autenticação digital e livro de partes em fase de aprovação.</p>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#142310] border border-[#cba135]/20">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-300 mb-1">
+                <Clock className="w-3.5 h-3.5 text-[#dfb642]" />
+                <span>Liberação Geral</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Disponibilização para técnicos e xerife após ordem do Chefe de Seção.</p>
+            </div>
+          </div>
+
+          {/* Botão de retorno */}
+          <div className="flex items-center justify-center gap-3">
+            {onGoBackToDashboard && (
+              <button
+                type="button"
+                onClick={onGoBackToDashboard}
+                className="px-6 py-3 rounded-xl bg-[#dfb642] hover:bg-[#ebd06b] text-[#192b14] font-black text-xs uppercase tracking-wider shadow-lg hover:shadow-[#dfb642]/20 cursor-pointer transition-all flex items-center gap-2 transform hover:scale-[1.02]"
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+                <span>Voltar ao Painel de Chamados</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
       
@@ -1973,7 +2328,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
                 2º GAC · REGIMENTO DEODORO
               </span>
               <span className="text-[10px] font-mono font-bold bg-[#dfb642] text-[#192b14] px-2 py-0.5 rounded">
-                Regra do Mais Folgado (Folgas 1 a 5 · Máx 5 dias)
+                Regra do Mais Folgado (Folgas 1 a {scaleRestDays} · Regime {scaleDutyDays}x{scaleRestDays})
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">
@@ -2131,9 +2486,9 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
                       ? 'bg-[#1e3316] text-[#dfb642] shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Escala Corrida: conta continuamente 1 a 5 dias de folga direto, priorizando sempre o mais folgado"
+                  title={`Escala Corrida: conta continuamente 1 a ${scaleRestDays} dias de folga direto, priorizando sempre o mais folgado`}
                 >
-                  🏃‍♂️ Escala Corrida (Folga 1 a 5 · Mais Folgado)
+                  🏃‍♂️ Escala Corrida (Folga 1 a {scaleRestDays})
                 </button>
                 <button
                   type="button"
@@ -2146,9 +2501,9 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
                       ? 'bg-[#1e3316] text-[#dfb642] shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Escala Preta e Vermelha: conta fins de semana e dias de semana separadamente (máximo 5 folgas)"
+                  title={`Escala Preta e Vermelha: conta fins de semana e dias de semana separadamente (máximo ${scaleRestDays} folgas)`}
                 >
-                  ⬛🔴 Preta e Vermelha (Folga 1 a 5 · Mais Folgado)
+                  ⬛🔴 Preta e Vermelha (Folga 1 a {scaleRestDays})
                 </button>
               </div>
             </div>
@@ -2206,6 +2561,17 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
                   >
                     <Sparkles className="w-3.5 h-3.5 text-[#dfb642] animate-pulse" />
                     <span>Escala Automática (IA / ML)</span>
+                  </button>
+
+                  {/* Botão 3: Configurar Parâmetros da Escala (DEV / Chefe) */}
+                  <button
+                    type="button"
+                    onClick={() => setIsScaleConfigModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    title="Configurar Parâmetros da Escala (Dias de descanso, militares por dia, postos)"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-slate-700" />
+                    <span>Parâmetros ({scaleDutyDays}x{scaleRestDays})</span>
                   </button>
                 </>
               )}
@@ -2270,18 +2636,18 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
 
               {/* Células Vermelhas */}
               <div className="flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded bg-red-600 text-white font-bold text-[11px] flex items-center justify-center font-mono border border-red-700">
-                  1-5
+                <span className="w-5 h-5 rounded bg-red-600 text-white font-bold text-[10px] flex items-center justify-center font-mono border border-red-700">
+                  1-{scaleRestDays}
                 </span>
-                <span className="text-slate-600 font-medium">Vermelha (Sáb/Dom/Administrativo - Folga 1 a 5)</span>
+                <span className="text-slate-600 font-medium">Vermelha (Sáb/Dom/Administrativo - Folga 1 a {scaleRestDays})</span>
               </div>
 
               {/* Células Brancas */}
               <div className="flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded bg-white text-slate-800 font-bold text-[11px] flex items-center justify-center font-mono border border-slate-300">
-                  1-5
+                <span className="w-5 h-5 rounded bg-white text-slate-800 font-bold text-[10px] flex items-center justify-center font-mono border border-slate-300">
+                  1-{scaleRestDays}
                 </span>
-                <span className="text-slate-600 font-medium">Preta (Dias de Semana - Folga 1 a 5)</span>
+                <span className="text-slate-600 font-medium">Preta (Dias de Semana - Folga 1 a {scaleRestDays})</span>
               </div>
 
               {/* Baixado Zebrado */}
@@ -3194,7 +3560,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
                   onAddAuditLog?.({
                     militaryName: currentUser?.name || 'Militar da TI',
                     militaryLogin: currentUser?.username || 'ti',
-                    role: currentUser?.role || 'CH-TECNICOINFO',
+                    role: currentUser?.role || 'INF-TECNICO',
                     actionType: 'STATUS_MISSAO',
                     summary: `Lavrou e encerrou Livro de Parte da Informática para a data ${selectedDateStr}`,
                     targetRef: `LIVRO-${selectedDateStr}`,
@@ -3521,7 +3887,7 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
                 <Sparkles className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
                 <div className="text-[11px] leading-tight">
                   <span className="font-bold block text-emerald-900">Preenchimento Automático Inteligente:</span>
-                  Ao salvar este dia, todos os dias subsequentes do mês serão calculados e preenchidos automaticamente seguindo a <strong>Regra do Mais Folgado</strong> (máximo 5 dias de folga, priorizando retornos de afastamentos e desempates justos).
+                  Ao salvar este dia, todos os dias subsequentes do mês serão calculados e preenchidos automaticamente seguindo a <strong>Regra do Mais Folgado</strong> (regime {scaleDutyDays}x{scaleRestDays} com folgas 1 a {scaleRestDays}, priorizando retornos de afastamentos e desempates justos).
                 </div>
               </div>
 
@@ -4261,6 +4627,198 @@ export const DutyRoster: React.FC<DutyRosterProps> = ({
                 className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 cursor-pointer"
               >
                 Fechar Janela
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CONFIGURAÇÃO DE PARÂMETROS DA ESCALA (DEV / CHEFE) */}
+      {isScaleConfigModalOpen && (
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setIsScaleConfigModalOpen(false); }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-[#27431e] max-h-[90vh] overflow-y-auto cursor-default animate-in fade-in zoom-in-95"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-2xl bg-[#1e3316] text-[#dfb642] border border-[#cba135]/40 shadow-xs">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">
+                    Parâmetros da Escala de Serviço
+                  </h3>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    Configuração de Folgas, Efetivo & Rótulos de Posto
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsScaleConfigModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
+                <strong>Atenção:</strong> Alterar a proporção de dias de folga por serviço recalcula os intervalos automáticos da IA e orienta a distribuição do efetivo militar da seção de TI.
+              </div>
+
+              {/* Proporção da Escala: Dias de Serviço x Dias de Folga */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-[#27431e]" />
+                  <span>Regime de Folga (Serviço x Descanso):</span>
+                </h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Dias de Serviço (X):
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={scaleDutyDays}
+                      onChange={(e) => setScaleDutyDays(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono font-bold text-center text-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Ex: 1 dia de plantão</span>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Dias de Folga (Y):
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={15}
+                      value={scaleRestDays}
+                      onChange={(e) => setScaleRestDays(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-mono font-bold text-center text-sm"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Ex: 6 folgas (Regime 1x6)</span>
+                  </div>
+                </div>
+
+                <div className="text-center pt-1">
+                  <span className="px-3 py-1 rounded-full bg-[#1e3316] text-[#dfb642] font-mono font-black text-xs">
+                    Regime Selecionado: {scaleDutyDays}x{scaleRestDays} ({scaleRestDays} dias de descanso para cada {scaleDutyDays} de serviço)
+                  </span>
+                </div>
+              </div>
+
+              {/* Militares por dia e Postos */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#27431e]" />
+                  <span>Efetivo por Dia & Nomenclatura dos Postos:</span>
+                </h4>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Militares Escalados por Dia:
+                  </label>
+                  <select
+                    value={scaleMilitariesPerDay}
+                    onChange={(e) => setScaleMilitariesPerDay(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold"
+                  >
+                    <option value={1}>1 Militar (Apenas Titular)</option>
+                    <option value={2}>2 Militares (Titular + Sobreaviso)</option>
+                    <option value={3}>3 Militares (Titular + Sobreaviso + 1 Extra)</option>
+                    <option value={4}>4 Militares (Titular + Sobreaviso + 2 Extras)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Rótulo Posto Titular:
+                    </label>
+                    <input
+                      type="text"
+                      value={scaleLabelPerm}
+                      onChange={(e) => setScaleLabelPerm(e.target.value)}
+                      placeholder="Ex: Permanência"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Rótulo Posto Reserva:
+                    </label>
+                    <input
+                      type="text"
+                      value={scaleLabelSobr}
+                      onChange={(e) => setScaleLabelSobr(e.target.value)}
+                      placeholder="Ex: Sobreaviso"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Capacidade do Efetivo da Escala */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 space-y-1">
+                <div className="flex items-center justify-between font-bold text-xs">
+                  <span>Efetivo Ativo Disponível:</span>
+                  <span className="font-mono text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                    {rosterMilitary.length} militares ({eps.length} EPs / {evs.length} EVs)
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Para o regime <strong>{scaleDutyDays}x{scaleRestDays}</strong>, cada militar terá exatamente <strong>{scaleRestDays} dias consecutivos de folga</strong> (contagem de 1 a {scaleRestDays}) antes de entrar de serviço novamente (0), eliminando qualquer militar em regimes desatualizados.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsScaleConfigModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 font-bold hover:bg-slate-100 text-slate-700 text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    localStorage.setItem('eb_scale_rest_days', String(scaleRestDays));
+                    localStorage.setItem('eb_scale_duty_days', String(scaleDutyDays));
+                    localStorage.setItem('eb_scale_militaries_per_day', String(scaleMilitariesPerDay));
+                    localStorage.setItem('eb_scale_label_perm', scaleLabelPerm);
+                    localStorage.setItem('eb_scale_label_sobr', scaleLabelSobr);
+                  } catch {}
+                  setIsScaleConfigModalOpen(false);
+                  triggerRippleRecalculation(0);
+                  onAddAuditLog?.({
+                    militaryName: currentUser?.name || 'Administrador',
+                    militaryLogin: currentUser?.username || 'admin',
+                    role: currentUser?.role || 'CH-SECINFO',
+                    actionType: 'CONFIG_ESCALA',
+                    summary: `Alterou parâmetros da escala de serviço para regime ${scaleDutyDays}x${scaleRestDays}`,
+                    details: `Militares/dia: ${scaleMilitariesPerDay} | Postos: ${scaleLabelPerm} / ${scaleLabelSobr}`,
+                    targetRef: 'PARAMETROS_ESCALA',
+                  });
+                  alert(`Parâmetros salvos com sucesso!\nRegime configurado: ${scaleDutyDays}x${scaleRestDays} (${scaleRestDays} dias de descanso de 1 a ${scaleRestDays}). A escala foi recalculada e nenhum militar ficará com folga inferior a ${scaleRestDays} dias.`);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-[#1e3316] text-[#dfb642] font-black hover:bg-[#27431e] shadow-md border border-[#cba135]/40 text-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Salvar & Recalcular Escala</span>
               </button>
             </div>
           </div>

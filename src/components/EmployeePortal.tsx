@@ -23,7 +23,8 @@ import {
   Send,
   Download,
   Loader2,
-  X
+  X,
+  Camera
 } from 'lucide-react';
 import { Ticket, Department, Category, AccessibilitySettings, Priority } from '../types';
 import { generateTicketPdf } from '../utils/ticketPdf';
@@ -39,6 +40,7 @@ interface EmployeePortalProps {
     category: string;
     departmentId: string;
     requesterName: string;
+    requesterAvatar?: string;
     priority: Priority;
   }) => Ticket;
   onUpdateTicketRating: (ticketId: string, rating: number, comment?: string) => void;
@@ -58,11 +60,26 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
   
   // Form State
   const [requesterName, setRequesterName] = useState('');
+  const [requesterAvatar, setRequesterAvatar] = useState('');
   const [departmentId, setDepartmentId] = useState(departments[0]?.id || '');
   const [selectedCategory, setSelectedCategory] = useState<string>('cat-printer');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<Priority>('media');
+
+  const handleRequesterAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A foto deve ter no máximo 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setRequesterAvatar(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
   
   // Track State: Apenas por código do chamado
   const [searchCodeInput, setSearchCodeInput] = useState('');
@@ -107,6 +124,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
       category: currentCat?.name || 'Geral',
       departmentId,
       requesterName: requesterName.trim(),
+      requesterAvatar: requesterAvatar || undefined,
       priority,
     });
 
@@ -116,6 +134,7 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
     setTitle('');
     setDescription('');
     setPriority('media');
+    setRequesterAvatar('');
   };
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -309,6 +328,42 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                 <p className="mt-1 text-xs text-slate-500">
                   {departments.find(d => d.id === departmentId)?.description}
                 </p>
+              </div>
+
+              {/* Foto de Identificação do Solicitante (Opcional) */}
+              <div className="md:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#1e3316] text-[#dfb642] flex items-center justify-center font-bold overflow-hidden shrink-0 border border-[#cba135]/40 shadow-inner">
+                  {requesterAvatar ? (
+                    <img src={requesterAvatar} alt="Foto" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-6 h-6 opacity-60" />
+                  )}
+                </div>
+                <div className="space-y-1 text-center sm:text-left flex-1">
+                  <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                    <label className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-300 hover:border-[#27431e] font-bold text-xs text-slate-700 cursor-pointer shadow-2xs inline-block">
+                      <span>Anexar Foto de Identificação (Opcional)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleRequesterAvatarUpload}
+                      />
+                    </label>
+                    {requesterAvatar && (
+                      <button
+                        type="button"
+                        onClick={() => setRequesterAvatar('')}
+                        className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
+                      >
+                        Remover Foto
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Facilita a identificação visual do militar pelo técnico de informática durante o atendimento no quartel.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -1050,9 +1105,10 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
 
                     {/* Avaliação */}
                     {isResolved && (
-                      <div className="mt-5 p-5 rounded-2xl bg-white border border-emerald-300 space-y-2">
-                        <div className="text-sm font-bold text-slate-800">
-                          Como você avalia o atendimento da Seção de Informática?
+                      <div className="mt-5 p-5 rounded-2xl bg-white border border-emerald-300 space-y-3 shadow-xs">
+                        <div className="flex items-center gap-2 text-sm font-black text-slate-800">
+                          <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                          <span>Como você avalia o atendimento da Seção de Informática?</span>
                         </div>
                         {t.resolutionNotes && (
                           <div className="text-xs text-slate-700 bg-emerald-50 p-3 rounded-xl border border-emerald-100">
@@ -1064,8 +1120,8 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                             <button
                               key={star}
                               type="button"
-                              onClick={() => onUpdateTicketRating(t.id, star)}
-                              className={`p-1.5 rounded-lg hover:scale-110 transition-transform ${
+                              onClick={() => onUpdateTicketRating(t.id, star, t.userFeedback)}
+                              className={`p-1.5 rounded-lg hover:scale-110 transition-transform cursor-pointer ${
                                 (t.rating || 0) >= star ? 'text-amber-400' : 'text-slate-300 hover:text-amber-300'
                               }`}
                               title={`Avaliar com ${star} estrelas`}
@@ -1073,9 +1129,26 @@ export const EmployeePortal: React.FC<EmployeePortalProps> = ({
                               <Star className="w-8 h-8 fill-current" />
                             </button>
                           ))}
-                          <span className="text-xs text-slate-600 ml-2 font-bold">
+                          <span className="text-xs text-slate-700 ml-2 font-bold">
                             {t.rating ? `Avaliação: ${t.rating} de 5 estrelas` : 'Clique nas estrelas para avaliar'}
                           </span>
+                        </div>
+
+                        <div className="pt-2">
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Comentário ou feedback sobre o atendimento (opcional):
+                          </label>
+                          <input
+                            type="text"
+                            defaultValue={t.userFeedback || ''}
+                            placeholder="Deixe um elogio ou observação sobre a solução..."
+                            onBlur={(e) => {
+                              if (e.target.value !== (t.userFeedback || '')) {
+                                onUpdateTicketRating(t.id, t.rating || 5, e.target.value);
+                              }
+                            }}
+                            className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
+                          />
                         </div>
                       </div>
                     )}

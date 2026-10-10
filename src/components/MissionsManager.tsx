@@ -72,15 +72,15 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
   onAddAuditLog,
 }) => {
   // Permissões Oficiais
-  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev';
+  const isDev = currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.role === 'System Developer' || currentUser?.username === 'dev';
   const isChefe = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || isDev;
   const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
-  const isXerife = currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO';
+  const isXerife = currentUser?.role === 'INF-XERIFE' || currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO';
   const canManageMissions = isChefe || isXerife || isDev; // Somente Chefe, Xerife e DEV criam e editam
   const canDeleteMissions = isChefe || isDev; // Chefe de Seção e DEV excluem
   const canTakeAttendance = isChefe || isAux || isXerife || isDev; // Xerifes, Auxiliares, Chefes e DEV
   const canSetPriority = isChefe || isAux || isXerife || isDev; // Xerife, Chefe, Aux e DEV definem prioridade
-  const isTV = currentUser?.role === 'CH-TVINFO';
+  const isTV = currentUser?.role === 'CH-TVINFO' || currentUser?.role === 'INF-TV';
   const canInteract = !isTV;
 
   // Hierarquia Militar: Xerife não inclui Chefe/Aux, Aux não inclui Chefe, Ninguém inclui DEV
@@ -1738,7 +1738,7 @@ export const MissionsManager: React.FC<MissionsManagerProps> = ({
                       const newNote = {
                         id: `n-${Date.now()}`,
                         author: currentUser?.name || 'Militar da TI',
-                        authorRole: currentUser?.role || 'CH-TECNICOINFO',
+                        authorRole: currentUser?.role || 'INF-TECNICO',
                         text: newNoteText.trim(),
                         createdAt: new Date().toISOString(),
                       };

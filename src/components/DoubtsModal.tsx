@@ -31,6 +31,8 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
   onFilterByDoubts,
   isFilterActive,
 }) => {
+  const [doubtTab, setDoubtTab] = useState<'all' | 'unread' | 'answered'>('all');
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,34 +44,56 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const [doubtTab, setDoubtTab] = useState<'all' | 'unread' | 'answered'>('all');
+  // Helper seguro para obter array de mensagens de um chamado (suporta JSON string do SQLite/Storage)
+  const getTicketMessages = (ticket: any) => {
+    if (!ticket || !ticket.messages) return [];
+    if (Array.isArray(ticket.messages)) return ticket.messages;
+    if (typeof ticket.messages === 'string') {
+      try {
+        const parsed = JSON.parse(ticket.messages);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const safeTickets = (Array.isArray(tickets) ? tickets : []).filter(Boolean);
+  const safeDepartments = (Array.isArray(departments) ? departments : []).filter(Boolean);
 
   // Filtrar chamados que possuem dúvidas/mensagens de solicitantes ou interações
-  const ticketsWithDoubts = tickets.filter(t => {
-    const hasUnread = t.messages?.some(m => m.sender === 'solicitante' && !m.readByTi);
-    const hasAnySolicitanteMsg = t.messages?.some(m => m.sender === 'solicitante');
+  const ticketsWithDoubts = safeTickets.filter(t => {
+    const msgs = getTicketMessages(t);
+    const hasUnread = msgs.some((m: any) => m && m.sender === 'solicitante' && !m.readByTi);
+    const hasAnySolicitanteMsg = msgs.some((m: any) => m && m.sender === 'solicitante');
     return hasUnread || hasAnySolicitanteMsg;
   });
 
   // Ordenar priorizando os que possuem mensagens não lidas
   const sortedTickets = [...ticketsWithDoubts].sort((a, b) => {
-    const unreadA = a.messages?.filter(m => m.sender === 'solicitante' && !m.readByTi).length || 0;
-    const unreadB = b.messages?.filter(m => m.sender === 'solicitante' && !m.readByTi).length || 0;
+    const msgsA = getTicketMessages(a);
+    const msgsB = getTicketMessages(b);
+    const unreadA = msgsA.filter((m: any) => m && m.sender === 'solicitante' && !m.readByTi).length;
+    const unreadB = msgsB.filter((m: any) => m && m.sender === 'solicitante' && !m.readByTi).length;
     if (unreadB !== unreadA) return unreadB - unreadA;
     return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
   });
 
-  const totalUnread = tickets.reduce((acc, t) => {
-    return acc + (t.messages?.filter(m => m.sender === 'solicitante' && !m.readByTi).length || 0);
+  const totalUnread = safeTickets.reduce((acc, t) => {
+    const msgs = getTicketMessages(t);
+    return acc + msgs.filter((m: any) => m && m.sender === 'solicitante' && !m.readByTi).length;
   }, 0);
 
   const totalAnswered = sortedTickets.filter(t => {
-    const hasUnread = t.messages?.some(m => m.sender === 'solicitante' && !m.readByTi);
+    const msgs = getTicketMessages(t);
+    const hasUnread = msgs.some((m: any) => m && m.sender === 'solicitante' && !m.readByTi);
     return !hasUnread;
   }).length;
 
   const displayedTickets = sortedTickets.filter(t => {
-    const hasUnread = t.messages?.some(m => m.sender === 'solicitante' && !m.readByTi);
+    const msgs = getTicketMessages(t);
+    const hasUnread = msgs.some((m: any) => m && m.sender === 'solicitante' && !m.readByTi);
     if (doubtTab === 'unread') return hasUnread;
     if (doubtTab === 'answered') return !hasUnread;
     return true;
@@ -194,14 +218,15 @@ export const DoubtsModal: React.FC<DoubtsModalProps> = ({
             </div>
           ) : (
             displayedTickets.map(t => {
-              const dept = departments.find(d => d.id === t.departmentId);
-              const unreadCount = t.messages?.filter(m => m.sender === 'solicitante' && !m.readByTi).length || 0;
-              const lastSolicitanteMsg = [...(t.messages || [])]
+              const dept = safeDepartments.find(d => d.id === t.departmentId);
+              const msgs = getTicketMessages(t);
+              const unreadCount = msgs.filter((m: any) => m && m.sender === 'solicitante' && !m.readByTi).length;
+              const lastSolicitanteMsg = [...msgs]
                 .reverse()
-                .find(m => m.sender === 'solicitante');
-              const lastTiMsg = [...(t.messages || [])]
+                .find((m: any) => m && m.sender === 'solicitante');
+              const lastTiMsg = [...msgs]
                 .reverse()
-                .find(m => m.sender === 'ti');
+                .find((m: any) => m && m.sender === 'ti');
 
               return (
                 <div

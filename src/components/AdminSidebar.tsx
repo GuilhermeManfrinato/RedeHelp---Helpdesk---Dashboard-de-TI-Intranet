@@ -24,6 +24,7 @@ import {
 import { AccessibilitySettings, MilitaryUser, AdminTab } from '../types';
 import { RegimentoDeodoroLogo } from './RegimentoDeodoroLogo';
 import { TvAccessModal } from './TvAccessModal';
+import { ENABLE_DUTY_ROSTER } from '../App';
 
 interface AdminSidebarProps {
   adminTab: AdminTab;
@@ -73,9 +74,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const [isManualExpanded, setIsManualExpanded] = useState<boolean>(false);
   const [showTvModal, setShowTvModal] = useState<boolean>(false);
 
-  const isChefeOrDev = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || currentUser?.role === 'dev' || currentUser?.username === 'dev';
-  const isTech = currentUser?.role === 'CH-TECNICOINFO' || currentUser?.role === 'TECINFO';
-  const isTvUser = currentUser?.role === 'CH-TVINFO';
+  const isChefeOrDev = currentUser?.role === 'CH-SECINFO' || currentUser?.role === 'CHSECINFO' || currentUser?.role === 'System Developer' || currentUser?.role === 'dev' || currentUser?.username === 'dev';
+  const isAux = currentUser?.role === 'AUX-SECINFO' || currentUser?.role === 'AUXSECINFO';
+  const isTech = currentUser?.role === 'INF-TECNICO' || currentUser?.role === 'CH-TECNICOINFO' || currentUser?.role === 'TECINFO';
+  const isTvUser = currentUser?.role === 'INF-TV' || currentUser?.role === 'CH-TVINFO';
   const isTvAllowed = isTvUser || currentUser?.username === 'dev' || currentUser?.rank === 'Dev';
 
   const handleTvClick = () => {
@@ -296,8 +298,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 ) : null}
               </button>
 
-              {/* Item 2: Cautela de Notebooks (Exclusivo Chefe de Seção e DEV) */}
-              {isChefeOrDev && (
+              {/* Item 2: Cautela de Notebooks (Chefe de Seção, Auxiliar de TI e DEV) */}
+              {(isChefeOrDev || isAux) && (
                 <button
                   onClick={() => {
                     onSelectAdminTab('notebooks');
@@ -382,8 +384,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 )}
               </button>
 
-              {/* Item: Escala de Serviço (Informático de Dia em Regime 1x6) - Oculto para TVINFO */}
-              {!isTvUser && (
+              {/* Item: Escala de Serviço (Informático de Dia em Regime 1x6) - Oculto para TVINFO ou se desativado */}
+              {ENABLE_DUTY_ROSTER && !isTvUser && (
                 <button
                   onClick={() => {
                     onSelectAdminTab('duty_roster');
@@ -533,48 +535,59 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* Rodapé da Barra Lateral: Sessão & Acessibilidade */}
-        <div className={`p-3 border-t border-[#2d4a22] bg-[#1a2c15] space-y-2.5 mt-auto shrink-0 w-full ${
-          !isExpanded ? 'flex flex-col items-center' : ''
+        <div className={`p-2.5 border-t border-[#2d4a22] bg-[#1a2c15] space-y-2 mt-auto shrink-0 w-full sticky bottom-0 z-20 ${
+          !isExpanded ? 'flex flex-col items-center pb-2.5' : 'pb-3'
         }`}>
           
           {/* Cartão do Usuário Conectado */}
-          <div className={`flex items-center rounded-2xl bg-[#152311] border border-[#2d4a22] ${
-            isExpanded ? 'justify-between p-2.5 w-full' : 'p-2 justify-center'
-          }`}>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-[#27431e] text-[#dfb642] flex items-center justify-center font-bold text-xs border border-[#cba135]/40 font-mono shrink-0">
-                {currentUser?.warName ? currentUser.warName.slice(0, 2).toUpperCase() : 'TI'}
-              </div>
-              {isExpanded && (
-                <div className="leading-tight min-w-0">
-                  <span className="text-xs font-bold text-white block truncate max-w-[130px]">
-                    {currentUser?.name || 'Militar da TI'}
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span className="truncate">{currentUser?.role || 'Sessão Ativa'}</span>
-                  </span>
-                </div>
-              )}
-            </div>
+          {(() => {
+            const isDevUser = currentUser?.role === 'System Developer' || currentUser?.role === 'dev' || currentUser?.role === 'DEV' || currentUser?.username === 'dev' || currentUser?.name?.toLowerCase().includes('manfrinato');
+            const displayedRole = isDevUser ? 'System Developer' : (currentUser?.role === 'CH-TECNICOINFO' || currentUser?.role === 'TECINFO') ? 'INF-TECNICO' : (currentUser?.role === 'CH-XERIFEINFO' || currentUser?.role === 'XERIFESECINFO') ? 'INF-XERIFE' : (currentUser?.role === 'CH-TVINFO') ? 'INF-TV' : (currentUser?.role === 'CHSECINFO') ? 'CH-SECINFO' : (currentUser?.role === 'AUXSECINFO') ? 'AUX-SECINFO' : currentUser?.role || 'Sessão Ativa';
 
-            {isExpanded && (
-              <button
-                onClick={onLogoutAdmin}
-                title="Encerrar sessão de TI (Logoff)"
-                className="p-1.5 rounded-xl text-red-300 hover:text-white hover:bg-red-950/80 transition-colors shrink-0"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+            return (
+              <div className={`flex items-center rounded-2xl bg-[#152311] border border-[#2d4a22] ${
+                isExpanded ? 'justify-between p-2.5 w-full' : 'p-1.5 justify-center'
+              }`} title={!isExpanded ? `${currentUser?.name} (${displayedRole})` : undefined}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-[#27431e] text-[#dfb642] flex items-center justify-center font-bold text-xs border border-[#cba135]/40 font-mono shrink-0 overflow-hidden shadow-xs">
+                    {currentUser?.avatar ? (
+                      <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                    ) : (
+                      currentUser?.warName ? currentUser.warName.slice(0, 2).toUpperCase() : 'TI'
+                    )}
+                  </div>
+                  {isExpanded && (
+                    <div className="leading-tight min-w-0">
+                      <span className="text-xs font-bold text-white block truncate max-w-[130px]">
+                        {currentUser?.name || 'Militar da TI'}
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="truncate">{displayedRole}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {isExpanded && (
+                  <button
+                    onClick={onLogoutAdmin}
+                    title="Encerrar sessão de TI (Logoff)"
+                    className="p-1.5 rounded-xl text-red-300 hover:text-white hover:bg-red-950/80 transition-colors shrink-0 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Botão Logoff quando minimizado */}
           {!isExpanded && (
             <button
               onClick={onLogoutAdmin}
               title="Encerrar sessão de TI (Logoff)"
-              className="p-2 rounded-xl text-red-300 hover:text-white hover:bg-red-950/80 transition-colors"
+              className="p-2 rounded-xl text-red-300 hover:text-white hover:bg-red-950/80 transition-colors w-full flex items-center justify-center cursor-pointer bg-[#152311] border border-red-950/50"
             >
               <LogOut className="w-4 h-4" />
             </button>

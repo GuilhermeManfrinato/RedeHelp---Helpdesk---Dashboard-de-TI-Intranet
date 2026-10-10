@@ -141,23 +141,25 @@
       "name": "Guilherme Manfrinato",
       "rank": "Dev",
       "warName": "Manfrinato",
-      "role": "CH-SECINFO",
+      "role": "System Developer",
       "active": true,
       "email": "manfrinato.ti@eb.mil.br",
       "specialty": "Desenvolvedor do Sistema & Administrador Geral (Acesso Total)",
+      "tags": ["Dev", "Software", "Redes", "Infra"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
-      "id": "usr-dasdeves",
-      "username": "dasdeves",
+      "id": "usr-dasneves",
+      "username": "dasneves",
       "password": "H3b3rt0n2001@",
-      "name": "3º Sgt Das Deves",
+      "name": "3º Sgt Das Neves",
       "rank": "3º Sgt",
-      "warName": "Das Deves",
+      "warName": "Das Neves",
       "role": "CH-SECINFO",
       "active": true,
-      "email": "dasdeves@eb.mil.br",
-      "specialty": "Chefe da Seção de Informática & Telemática (CHSECINFO)",
+      "email": "dasneves@eb.mil.br",
+      "specialty": "Chefe da Seção de Informática & Telemática (CH-SECINFO)",
+      "tags": ["Infra", "Redes", "Gestão"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
@@ -170,7 +172,8 @@
       "role": "CH-SECINFO",
       "active": true,
       "email": "cavalcanti@eb.mil.br",
-      "specialty": "Chefe da Seção de Informática & Telemática (CHSECINFO)",
+      "specialty": "Chefe da Seção de Informática & Telemática (CH-SECINFO)",
+      "tags": ["Infra", "Hardware", "Gestão"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
@@ -183,7 +186,8 @@
       "role": "AUX-SECINFO",
       "active": true,
       "email": "castro@eb.mil.br",
-      "specialty": "Auxiliar da Seção de Informática (AUXSECINFO)",
+      "specialty": "Auxiliar da Seção de Informática (AUX-SECINFO)",
+      "tags": ["Suporte", "Software"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
@@ -193,10 +197,11 @@
       "name": "Sd Arantes",
       "rank": "Sd",
       "warName": "Arantes",
-      "role": "CH-XERIFEINFO",
+      "role": "INF-XERIFE",
       "active": true,
       "email": "arantes@eb.mil.br",
-      "specialty": "Xerife do Corpo Técnico (XERIFESECINFO)",
+      "specialty": "Xerife do Corpo Técnico (INF-XERIFE)",
+      "tags": ["Hardware", "Redes", "Suporte"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
@@ -206,10 +211,11 @@
       "name": "Sd Machado",
       "rank": "Sd",
       "warName": "Machado",
-      "role": "CH-TECNICOINFO",
+      "role": "INF-TECNICO",
       "active": true,
       "email": "machado@eb.mil.br",
-      "specialty": "Técnico de Informática (TECINFO)",
+      "specialty": "Técnico de Informática (INF-TECNICO)",
+      "tags": ["Hardware", "Suporte"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
@@ -219,10 +225,11 @@
       "name": "Sd Oliveira",
       "rank": "Sd",
       "warName": "Oliveira",
-      "role": "CH-TECNICOINFO",
+      "role": "INF-TECNICO",
       "active": true,
       "email": "oliveira@eb.mil.br",
-      "specialty": "Técnico de Informática (TECINFO)",
+      "specialty": "Técnico de Informática (INF-TECNICO)",
+      "tags": ["Redes", "Suporte"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
@@ -232,10 +239,11 @@
       "name": "Sd Vecchiato",
       "rank": "Sd",
       "warName": "Vecchiato",
-      "role": "CH-TECNICOINFO",
+      "role": "INF-TECNICO",
       "active": true,
       "email": "vecchiato@eb.mil.br",
-      "specialty": "Técnico de Informática (TECINFO)",
+      "specialty": "Técnico de Informática (INF-TECNICO)",
+      "tags": ["Hardware", "Software"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     },
     {
@@ -245,10 +253,11 @@
       "name": "Painel TV da Seção",
       "rank": "TI",
       "warName": "Telão Sala TI",
-      "role": "CH-TVINFO",
+      "role": "INF-TV",
       "active": true,
       "email": "tv.informatica@eb.mil.br",
       "specialty": "Exibição de Status e Chamados (Sem Interação)",
+      "tags": ["Telão"],
       "createdAt": "2026-10-05T00:00:00.000Z"
     }
   ],
